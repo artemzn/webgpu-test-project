@@ -64,6 +64,10 @@ export class RenderManager {
       return;
     }
 
+    if (!visibleCells || !viewport) {
+      throw new Error('Invalid parameters: visibleCells and viewport must be provided');
+    }
+
     try {
       // Начинаем рендер-пасс
       const commandEncoder = this.device.createCommandEncoder();
@@ -129,16 +133,16 @@ export class RenderManager {
   }
 
   /**
-   * Рендеринг видимых ячеек
+   * Рендеринг видимых ячеек с поддержкой instancing
    */
   private renderVisibleCells(renderPass: GPURenderPassEncoder, visibleCells: any[]): void {
-    // Пока что рендерим простую сетку
-    // В будущем здесь будет рендеринг конкретных ячеек
+    const cellCount = visibleCells.length || 100;
 
-    const cellCount = visibleCells.length || 100; // Минимум 100 ячеек для демо
+    if (cellCount === 0) return;
 
-    // Рендерим по 6 вершин на ячейку (2 треугольника)
-    renderPass.draw(cellCount * 6, 1, 0, 0);
+    // Используем instancing для эффективного рендеринга множества ячеек
+    // Рендерим один квад (6 вершин) для каждой ячейки
+    renderPass.draw(6, cellCount, 0, 0);
   }
 
   /**

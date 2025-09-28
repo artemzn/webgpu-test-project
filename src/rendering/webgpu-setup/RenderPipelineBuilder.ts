@@ -50,7 +50,7 @@ export class RenderPipelineBuilder {
   }
 
   /**
-   * Создание вершинного шейдера
+   * Создание вершинного шейдера с поддержкой instancing
    */
   private createVertexShader(): string {
     return `
@@ -72,7 +72,10 @@ export class RenderPipelineBuilder {
       @group(0) @binding(0) var<uniform> gridUniforms: GridUniforms;
 
       @vertex
-      fn vs_main(@builtin(vertex_index) vertexIndex: u32) -> VertexOutput {
+      fn vs_main(
+        @builtin(vertex_index) vertexIndex: u32,
+        @builtin(instance_index) instanceIndex: u32
+      ) -> VertexOutput {
         var output: VertexOutput;
         
         // Создаем квад из 6 вершин (2 треугольника)
@@ -83,20 +86,25 @@ export class RenderPipelineBuilder {
         
         let pos = positions[vertexIndex];
         
-        // Вычисляем позицию ячейки
-        let cellX = f32(vertexIndex / 6);
-        let cellY = 0.0; // Будет вычисляться в compute shader
+        // Вычисляем позицию ячейки на основе instance_index
+        let cellsPerRow = u32(gridUniforms.totalCells.x);
+        let cellX = instanceIndex % cellsPerRow;
+        let cellY = instanceIndex / cellsPerRow;
         
         // Преобразуем в экранные координаты
         let worldPos = vec2f(
-          cellX * gridUniforms.cellSize.x + gridUniforms.viewportOffset.x,
-          cellY * gridUniforms.cellSize.y + gridUniforms.viewportOffset.y
+          f32(cellX) * gridUniforms.cellSize.x + gridUniforms.viewportOffset.x,
+          f32(cellY) * gridUniforms.cellSize.y + gridUniforms.viewportOffset.y
         );
         
-        output.position = vec4f(worldPos, 0.0, 1.0);
+        // Масштабируем позицию вершины относительно ячейки
+        let scaledPos = pos * gridUniforms.cellSize;
+        let finalPos = worldPos + scaledPos;
+        
+        output.position = vec4f(finalPos, 0.0, 1.0);
         output.color = vec4f(0.95, 0.95, 0.95, 1.0); // Светло-серый фон
         output.cellCoord = pos;
-        output.cellIndex = vec2f(cellX, cellY);
+        output.cellIndex = vec2f(f32(cellX), f32(cellY));
         
         return output;
       }
@@ -104,7 +112,7 @@ export class RenderPipelineBuilder {
   }
 
   /**
-   * Создание фрагментного шейдера
+   * Создание оптимизированного фрагментного шейдера
    */
   private createFragmentShader(): string {
     return `
@@ -115,17 +123,20 @@ export class RenderPipelineBuilder {
         @location(2) cellIndex: vec2f
       ) -> @location(0) vec4f {
         
-        // Рисуем границы ячеек
-        let borderWidth = 0.02;
-        if (cellCoord.x < borderWidth || 
-            cellCoord.x > 1.0 - borderWidth ||
-            cellCoord.y < borderWidth || 
-            cellCoord.y > 1.0 - borderWidth) {
-          return vec4f(0.7, 0.7, 0.7, 1.0); // Темно-серые границы
+        // Оптимизированное рисование границ ячеек
+        let borderWidth = 0.01;
+        let isBorder = (cellCoord.x < borderWidth) || 
+                      (cellCoord.x > 1.0 - borderWidth) ||
+                      (cellCoord.y < borderWidth) || 
+                      (cellCoord.y > 1.0 - borderWidth);
+        
+        if (isBorder) {
+          return vec4f(0.8, 0.8, 0.8, 1.0); // Светло-серые границы
         }
         
-        // Основной цвет ячейки
-        return color;
+        // Основной цвет ячейки с легким градиентом для глубины
+        let gradient = 0.95 + (cellCoord.x + cellCoord.y) * 0.02;
+        return vec4f(gradient, gradient, gradient, 1.0);
       }
     `;
   }
@@ -176,12 +187,19 @@ export class RenderPipelineBuilder {
     viewportSize: [number, number],
     totalCells: [number, number]
   ): void {
+    // Проверяем, что все параметры являются массивами
+    const safeGridSize = Array.isArray(gridSize) ? gridSize : [0, 0];
+    const safeCellSize = Array.isArray(cellSize) ? cellSize : [0, 0];
+    const safeViewportOffset = Array.isArray(viewportOffset) ? viewportOffset : [0, 0];
+    const safeViewportSize = Array.isArray(viewportSize) ? viewportSize : [0, 0];
+    const safeTotalCells = Array.isArray(totalCells) ? totalCells : [0, 0];
+
     const data = new Float32Array([
-      ...gridSize, // gridSize: vec2f
-      ...cellSize, // cellSize: vec2f
-      ...viewportOffset, // viewportOffset: vec2f
-      ...viewportSize, // viewportSize: vec2f
-      ...totalCells, // totalCells: vec2f
+      ...safeGridSize, // gridSize: vec2f
+      ...safeCellSize, // cellSize: vec2f
+      ...safeViewportOffset, // viewportOffset: vec2f
+      ...safeViewportSize, // viewportSize: vec2f
+      ...safeTotalCells, // totalCells: vec2f
       0.0,
       0.0, // padding
     ]);

@@ -5,6 +5,7 @@
 import type { AppConfig, InitializationResult } from './types/index.js';
 import { WebGPUDeviceManager } from './rendering/webgpu-setup/DeviceManager.js';
 import { RenderManager } from './rendering/webgpu-setup/RenderManager.js';
+import { GridRenderer } from './rendering/GridRenderer.js';
 import { VirtualGrid } from './core/virtual-grid/VirtualGrid.js';
 import { SparseMatrix } from './core/sparse-matrix/SparseMatrix.js';
 
@@ -13,6 +14,7 @@ export class App {
   private canvas: HTMLCanvasElement;
   private webgpuManager: WebGPUDeviceManager | null = null;
   private renderManager: RenderManager | null = null;
+  private gridRenderer: GridRenderer | null = null;
   private virtualGrid: VirtualGrid | null = null;
   private sparseMatrix: SparseMatrix | null = null;
   private isInitialized = false;
@@ -68,19 +70,28 @@ export class App {
    */
   private async initializeWebGPU(): Promise<void> {
     console.log('🔧 Инициализация WebGPU...');
-    
+
     this.webgpuManager = new WebGPUDeviceManager();
     const result: InitializationResult = await this.webgpuManager.initialize(this.canvas);
-    
+
     if (!result.success || !result.config) {
       throw new Error(`WebGPU инициализация не удалась: ${result.error}`);
     }
-    
+
     // Создаем менеджер рендеринга
     this.renderManager = new RenderManager(result.config, this.canvas);
     await this.renderManager.initialize();
-    
-    console.log('✅ WebGPU и рендер-пайплайн успешно инициализированы');
+
+    // Создаем GridRenderer для оптимизированного рендеринга сетки
+    this.gridRenderer = new GridRenderer(
+      result.config,
+      this.canvas,
+      this.config.cellWidth,
+      this.config.cellHeight
+    );
+    await this.gridRenderer.initialize();
+
+    console.log('✅ WebGPU, рендер-пайплайн и GridRenderer успешно инициализированы');
   }
 
   /**
@@ -335,18 +346,17 @@ export class App {
   }
 
   /**
-   * Рендеринг через WebGPU
+   * Рендеринг через WebGPU с использованием GridRenderer
    */
   private renderWithWebGPU(cells: any[]): void {
-    if (!this.renderManager || !this.virtualGrid) return;
-    
+    if (!this.gridRenderer || !this.virtualGrid) return;
+
     try {
       // Получаем viewport для рендеринга
       const viewport = this.virtualGrid.getViewport();
-      
-      // Рендерим через WebGPU
-      this.renderManager.render(cells, viewport);
-      
+
+      // Рендерим через оптимизированный GridRenderer
+      this.gridRenderer.render(cells, viewport);
     } catch (error) {
       console.error('❌ Ошибка WebGPU рендеринга:', error);
       // Fallback на Canvas 2D
