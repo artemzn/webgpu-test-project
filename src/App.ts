@@ -495,24 +495,27 @@ export class App {
    * Настройка размера canvas
    */
   private setupCanvas(): void {
-    const container = this.canvas.parentElement;
-    if (!container) return;
+    this.updateCanvasSize(); // Сразу устанавливаем размер
 
-    // Получаем размеры контейнера
-    const containerRect = container.getBoundingClientRect();
-    const width = containerRect.width;
-    const height = containerRect.height;
-
-    // Устанавливаем размеры canvas
-    this.canvas.width = width;
-    this.canvas.height = height;
-
-    console.log(`📐 Canvas размер установлен: ${width}x${height}`);
-
-    // Добавляем обработчик изменения размера окна
+    // Обработчики для полной адаптивности
     window.addEventListener('resize', () => {
       this.updateCanvasSize();
     });
+
+    // Для мобильных - изменение ориентации
+    window.addEventListener('orientationchange', () => {
+      setTimeout(() => this.updateCanvasSize(), 100); // Задержка для корректного расчета
+    });
+
+    // Дополнительно - для случаев когда layout меняется
+    const resizeObserver = new ResizeObserver(() => {
+      this.updateCanvasSize();
+    });
+
+    const container = this.canvas.parentElement;
+    if (container) {
+      resizeObserver.observe(container);
+    }
   }
 
   /**
@@ -522,22 +525,32 @@ export class App {
     const container = this.canvas.parentElement;
     if (!container) return;
 
-    const containerRect = container.getBoundingClientRect();
-    const width = containerRect.width;
-    const height = containerRect.height;
+    // Принудительно обновляем layout для мобильных
+    requestAnimationFrame(() => {
+      const containerRect = container.getBoundingClientRect();
+      let width = Math.floor(containerRect.width);
+      let height = Math.floor(containerRect.height);
 
-    this.canvas.width = width;
-    this.canvas.height = height;
+      // Минимальные размеры для стабильности
+      width = Math.max(width, 320);
+      height = Math.max(height, 200);
 
-    console.log(`📐 Canvas размер обновлен: ${width}x${height}`);
+      // Обновляем только если размер действительно изменился
+      if (this.canvas.width !== width || this.canvas.height !== height) {
+        this.canvas.width = width;
+        this.canvas.height = height;
 
-    // Обновляем виртуальную сетку
-    if (this.virtualGrid) {
-      this.virtualGrid.updateCanvasSize(width, height);
-    }
+        console.log(`📐 Canvas размер обновлен: ${width}x${height}`);
 
-    // Помечаем, что нужна перерисовка
-    this.needsRender = true;
+        // Обновляем виртуальную сетку
+        if (this.virtualGrid) {
+          this.virtualGrid.updateCanvasSize(width, height);
+        }
+
+        // Помечаем, что нужна перерисовка
+        this.needsRender = true;
+      }
+    });
   }
 
   // Методы для обработки действий (заглушки)

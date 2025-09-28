@@ -21,13 +21,16 @@
         
         html, body {
             height: 100%;
+            width: 100%;
         }
 
         #app {
             width: 100vw;
             height: 100dvh; /* корректная высота на мобильных */
+            min-height: 100vh; /* fallback для старых браузеров */
             display: flex;
             flex-direction: column;
+            position: relative;
         }
         
         .toolbar {
@@ -124,6 +127,63 @@
             background: #fff3e0;
             color: #e65100;
             border-color: #ffcc02;
+        }
+
+        /* Адаптивность для мобильных */
+        @media (max-width: 768px) {
+            .toolbar {
+                padding: 4px 8px;
+                gap: 8px;
+                flex-wrap: wrap;
+            }
+            
+            .toolbar-button {
+                padding: 4px 8px;
+                font-size: 12px;
+                min-width: auto;
+            }
+            
+            .formula-bar {
+                padding: 4px 8px;
+                gap: 8px;
+            }
+            
+            .formula-input {
+                font-size: 12px;
+                padding: 4px 8px;
+            }
+            
+            .status-bar {
+                padding: 2px 8px;
+                font-size: 11px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .toolbar {
+                padding: 2px 4px;
+                gap: 4px;
+            }
+            
+            .toolbar-button {
+                padding: 2px 6px;
+                font-size: 11px;
+            }
+            
+            .formula-bar {
+                padding: 2px 4px;
+            }
+        }
+
+        /* Ориентация */
+        @media (orientation: landscape) and (max-height: 500px) {
+            .toolbar {
+                padding: 2px 8px;
+            }
+            
+            .formula-bar {
+                padding: 2px 8px;
+            }
         }
     </style>
 </head>
