@@ -202,6 +202,20 @@ export class App {
     this.canvas.addEventListener('wheel', event => {
       this.handleCanvasWheel(event);
     });
+
+    // Обработка контекстного меню
+    this.canvas.addEventListener('contextmenu', event => {
+      event.preventDefault();
+      this.showContextMenu(event);
+    });
+
+    // Закрытие контекстного меню при клике вне его
+    document.addEventListener('click', () => {
+      this.hideContextMenu();
+    });
+
+    // Обработка клика по элементам контекстного меню
+    this.setupContextMenuHandlers();
   }
 
   /**
@@ -452,7 +466,18 @@ export class App {
    * Обновление статус-бара
    */
   private updateStatusBar(): void {
+    const cellInfo = document.getElementById('cell-info');
     const statusText = document.getElementById('status-text');
+
+    if (this.virtualGrid) {
+      const activeCell = this.virtualGrid.getActiveCell();
+      if (activeCell && cellInfo) {
+        const colName = this.getColumnName(activeCell.col);
+        const rowName = (activeCell.row + 1).toString();
+        cellInfo.textContent = `${colName}${rowName}`;
+      }
+    }
+
     if (statusText) {
       statusText.textContent = 'Готов';
     }
@@ -556,14 +581,94 @@ export class App {
   // Методы для обработки действий (заглушки)
   private createNewSpreadsheet(): void {
     console.log('📄 Создание новой таблицы');
+
+    if (this.sparseMatrix && this.virtualGrid) {
+      // Очищаем все данные
+      this.sparseMatrix.clear();
+
+      // Возвращаемся в начало
+      this.virtualGrid.scrollToHome();
+      this.virtualGrid.setActiveCell({ row: 0, col: 0 });
+
+      // Очищаем поле формул
+      const formulaInput = document.getElementById('formula-input') as HTMLInputElement;
+      if (formulaInput) {
+        formulaInput.value = '';
+      }
+
+      // Обновляем статус
+      this.updateStatusBar();
+      this.needsRender = true;
+
+      console.log('✅ Новая таблица создана');
+    }
   }
 
   private openSpreadsheet(): void {
     console.log('📁 Открытие таблицы');
+
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+
+    input.onchange = event => {
+      const file = (event.target as HTMLInputElement).files?.[0];
+      if (file && this.sparseMatrix) {
+        const reader = new FileReader();
+        reader.onload = e => {
+          try {
+            const data = JSON.parse(e.target?.result as string);
+
+            // Очищаем текущие данные
+            this.sparseMatrix!.clear();
+
+            // Загружаем новые данные
+            if (data.cells) {
+              Object.entries(data.cells).forEach(([key, value]) => {
+                const [row, col] = key.split(',').map(Number);
+                this.sparseMatrix!.setCell(row, col, value as string);
+              });
+            }
+
+            // Обновляем отображение
+            this.updateDisplay();
+            this.needsRender = true;
+
+            console.log('✅ Таблица загружена');
+          } catch (error) {
+            console.error('❌ Ошибка загрузки файла:', error);
+            alert('Ошибка при загрузке файла');
+          }
+        };
+        reader.readAsText(file);
+      }
+    };
+
+    input.click();
   }
 
   private saveSpreadsheet(): void {
     console.log('💾 Сохранение таблицы');
+
+    if (this.sparseMatrix) {
+      const data = {
+        cells: this.sparseMatrix.getAllCells(),
+        createdAt: new Date().toISOString(),
+      };
+
+      const blob = new Blob([JSON.stringify(data, null, 2)], {
+        type: 'application/json',
+      });
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `spreadsheet_${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+
+      URL.revokeObjectURL(url);
+      console.log('✅ Таблица сохранена');
+    }
   }
 
   private undo(): void {
@@ -576,9 +681,196 @@ export class App {
 
   private copy(): void {
     console.log('📋 Копирование');
+
+    if (this.virtualGrid && this.sparseMatrix) {
+      const activeCell = this.virtualGrid.getActiveCell();
+      if (activeCell) {
+        const value = this.sparseMatrix.getCell(activeCell.row, activeCell.col);
+
+        // Копируем в clipboard
+        if (navigator.clipboard && window.isSecureContext) {
+          navigator.clipboard
+            .writeText(value || '')
+            .then(() => {
+              console.log('✅ Значение скопировано в буфер обмена');
+            })
+            .catch(error => {
+              console.warn('⚠️ Не удалось скопировать в буфер обмена:', error);
+            });
+        }
+
+        // Также сохраняем внутри приложения
+        (this as any).clipboardValue = value || '';
+
+        console.log(`✅ Скопировано: "${value}" из ячейки ${activeCell.row},${activeCell.col}`);
+      }
+    }
   }
 
   private paste(): void {
     console.log('📋 Вставка');
+
+    if (this.virtualGrid && this.sparseMatrix) {
+      const activeCell = this.virtualGrid.getActiveCell();
+      if (activeCell) {
+        // Пытаемся получить из системного буфера обмена
+        if (navigator.clipboard && window.isSecureContext) {
+          navigator.clipboard
+            .readText()
+            .then(text => {
+              this.sparseMatrix!.setCell(activeCell.row, activeCell.col, text);
+              this.updateDisplay();
+              this.needsRender = true;
+              console.log(`✅ Вставлено: "${text}" в ячейку ${activeCell.row},${activeCell.col}`);
+            })
+            .catch(() => {
+              // Fallback на внутренний буфер
+              this.pasteFromInternalClipboard(activeCell);
+            });
+        } else {
+          // Fallback на внутренний буфер
+          this.pasteFromInternalClipboard(activeCell);
+        }
+      }
+    }
+  }
+
+  private pasteFromInternalClipboard(activeCell: { row: number; col: number }): void {
+    const clipboardValue = (this as any).clipboardValue;
+    if (clipboardValue !== undefined && this.sparseMatrix) {
+      this.sparseMatrix.setCell(activeCell.row, activeCell.col, clipboardValue);
+      this.updateDisplay();
+      this.needsRender = true;
+      console.log(`✅ Вставлено: "${clipboardValue}" в ячейку ${activeCell.row},${activeCell.col}`);
+    }
+  }
+
+  /**
+   * Настройка обработчиков контекстного меню
+   */
+  private setupContextMenuHandlers(): void {
+    const contextMenu = document.getElementById('context-menu');
+    if (contextMenu) {
+      contextMenu.addEventListener('click', event => {
+        event.stopPropagation();
+        const target = event.target as HTMLElement;
+        const action = target.getAttribute('data-action');
+        if (action) {
+          this.handleContextMenuAction(action);
+          this.hideContextMenu();
+        }
+      });
+    }
+  }
+
+  /**
+   * Показать контекстное меню
+   */
+  private showContextMenu(event: MouseEvent): void {
+    const contextMenu = document.getElementById('context-menu');
+    if (contextMenu) {
+      contextMenu.style.display = 'block';
+      contextMenu.style.left = `${event.clientX}px`;
+      contextMenu.style.top = `${event.clientY}px`;
+    }
+  }
+
+  /**
+   * Скрыть контекстное меню
+   */
+  private hideContextMenu(): void {
+    const contextMenu = document.getElementById('context-menu');
+    if (contextMenu) {
+      contextMenu.style.display = 'none';
+    }
+  }
+
+  /**
+   * Обработка действий контекстного меню
+   */
+  private handleContextMenuAction(action: string): void {
+    console.log(`🔧 Действие контекстного меню: ${action}`);
+
+    switch (action) {
+      case 'copy':
+        this.copy();
+        break;
+      case 'paste':
+        this.paste();
+        break;
+      case 'insert-row':
+        this.insertRow();
+        break;
+      case 'insert-col':
+        this.insertColumn();
+        break;
+      case 'delete-row':
+        this.deleteRow();
+        break;
+      case 'delete-col':
+        this.deleteColumn();
+        break;
+      case 'clear-cell':
+        this.clearCell();
+        break;
+      default:
+        console.warn(`Неизвестное действие контекстного меню: ${action}`);
+    }
+  }
+
+  /**
+   * Вставка строки
+   */
+  private insertRow(): void {
+    console.log('➕ Вставка строки (заглушка)');
+    // TODO: Реализовать в следующем спринте
+  }
+
+  /**
+   * Вставка столбца
+   */
+  private insertColumn(): void {
+    console.log('➕ Вставка столбца (заглушка)');
+    // TODO: Реализовать в следующем спринте
+  }
+
+  /**
+   * Удаление строки
+   */
+  private deleteRow(): void {
+    console.log('🗑️ Удаление строки (заглушка)');
+    // TODO: Реализовать в следующем спринте
+  }
+
+  /**
+   * Удаление столбца
+   */
+  private deleteColumn(): void {
+    console.log('🗑️ Удаление столбца (заглушка)');
+    // TODO: Реализовать в следующем спринте
+  }
+
+  /**
+   * Очистка ячейки
+   */
+  private clearCell(): void {
+    console.log('🧹 Очистка ячейки');
+
+    if (this.virtualGrid && this.sparseMatrix) {
+      const activeCell = this.virtualGrid.getActiveCell();
+      if (activeCell) {
+        this.sparseMatrix.setCell(activeCell.row, activeCell.col, '');
+
+        // Очищаем поле формул
+        const formulaInput = document.getElementById('formula-input') as HTMLInputElement;
+        if (formulaInput) {
+          formulaInput.value = '';
+        }
+
+        this.updateDisplay();
+        this.needsRender = true;
+        console.log(`✅ Ячейка ${activeCell.row},${activeCell.col} очищена`);
+      }
+    }
   }
 }

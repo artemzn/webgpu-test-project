@@ -129,6 +129,44 @@
             border-color: #ffcc02;
         }
 
+        /* Контекстное меню */
+        .context-menu {
+            position: fixed;
+            background: #fff;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 1000;
+            min-width: 150px;
+            display: none;
+        }
+        
+        .context-menu-item {
+            padding: 8px 16px;
+            cursor: pointer;
+            border-bottom: 1px solid #f0f0f0;
+            font-size: 14px;
+        }
+        
+        .context-menu-item:hover {
+            background: #f0f0f0;
+        }
+        
+        .context-menu-item:last-child {
+            border-bottom: none;
+        }
+        
+        .context-menu-item.disabled {
+            color: #999;
+            cursor: not-allowed;
+        }
+        
+        .context-menu-separator {
+            height: 1px;
+            background: #e0e0e0;
+            margin: 4px 0;
+        }
+
         /* Адаптивность для мобильных */
         @media (max-width: 768px) {
             .toolbar {
@@ -233,6 +271,20 @@
             <span id="status-text">Готов</span>
             <span id="performance-info">FPS: --</span>
         </div>
+    </div>
+    
+    <!-- Контекстное меню -->
+    <div id="context-menu" class="context-menu">
+        <div class="context-menu-item" data-action="copy">📋 Копировать</div>
+        <div class="context-menu-item" data-action="paste">📋 Вставить</div>
+        <div class="context-menu-separator"></div>
+        <div class="context-menu-item" data-action="insert-row">➕ Вставить строку</div>
+        <div class="context-menu-item" data-action="insert-col">➕ Вставить столбец</div>
+        <div class="context-menu-separator"></div>
+        <div class="context-menu-item" data-action="delete-row">🗑️ Удалить строку</div>
+        <div class="context-menu-item" data-action="delete-col">🗑️ Удалить столбец</div>
+        <div class="context-menu-separator"></div>
+        <div class="context-menu-item" data-action="clear-cell">🧹 Очистить ячейку</div>
     </div>
     
     <script type="module" src="/src/main.ts"></script>
