@@ -154,6 +154,24 @@ export class GridRenderer {
   }
 
   /**
+   * Alias для getRenderStats (для совместимости с тестами)
+   */
+  getRenderingStats(): {
+    lastRenderTime: number;
+    visibleCellsCount: number;
+    needsRedraw: boolean;
+    cellSize: { width: number; height: number };
+  } {
+    const stats = this.getRenderStats();
+    return {
+      lastRenderTime: 0, // Заглушка для времени рендеринга
+      visibleCellsCount: stats.visibleCellsCount,
+      needsRedraw: stats.needsRedraw,
+      cellSize: stats.cellSize,
+    };
+  }
+
+  /**
    * Проверка изменения viewport
    */
   private viewportUnchanged(viewport: Viewport): boolean {
