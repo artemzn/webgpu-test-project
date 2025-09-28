@@ -153,8 +153,12 @@ beforeAll(() => {
 
 afterAll(() => {
   // Очистка после тестов
-  if (navigator.gpu) {
-    delete (navigator as any).gpu;
+  try {
+    if (navigator.gpu) {
+      (navigator as any).gpu = undefined;
+    }
+  } catch (error) {
+    // Игнорируем ошибки очистки
   }
 
   // Восстанавливаем оригинальный getContext

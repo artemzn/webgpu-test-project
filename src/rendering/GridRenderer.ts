@@ -56,32 +56,35 @@ export class GridRenderer {
   /**
    * Рендеринг сетки
    */
-  render(visibleCells: Cell[], viewport: Viewport, selectedCell?: any): void {
-    try {
-      // Проверяем, нужно ли перерисовывать
-      const needsMainRender = this.needsRedraw || !this.viewportUnchanged(viewport);
-      const needsSelectionRender = selectedCell !== null;
+  render(visibleCells: Cell[], viewport: Viewport, selectedCell?: any): Promise<void> {
+    return new Promise((resolve, reject) => {
+      try {
+        // Проверяем, нужно ли перерисовывать
+        const needsMainRender = this.needsRedraw || !this.viewportUnchanged(viewport);
+        const needsSelectionRender = selectedCell !== null;
 
-      // ВСЕГДА рендерим если есть выделение или нужен основной рендер
-      if (needsMainRender || needsSelectionRender) {
-        // Обновляем кеш только при основном рендере
-        if (needsMainRender) {
-          this.lastViewport = { ...viewport };
-          this.lastVisibleCells = [...visibleCells];
-          this.needsRedraw = false;
+        // ВСЕГДА рендерим если есть выделение или нужен основной рендер
+        if (needsMainRender || needsSelectionRender) {
+          // Обновляем кеш только при основном рендере
+          if (needsMainRender) {
+            this.lastViewport = { ...viewport };
+            this.lastVisibleCells = Array.isArray(visibleCells) ? [...visibleCells] : [];
+            this.needsRedraw = false;
+          }
+
+          // Рендерим через RenderManager с выделением в том же render pass
+          this.renderManager.render(visibleCells, viewport, selectedCell);
+
+          console.log(
+            `🎯 GridRenderer: needsMainRender=${needsMainRender}, needsSelectionRender=${needsSelectionRender}, selectedCell=${selectedCell ? 'есть' : 'нет'}, cache=${this.viewportUnchanged(viewport) ? 'HIT' : 'MISS'}`
+          );
         }
-
-        // Рендерим через RenderManager с выделением в том же render pass
-        this.renderManager.render(visibleCells, viewport, selectedCell);
-
-        console.log(
-          `🎯 GridRenderer: needsMainRender=${needsMainRender}, needsSelectionRender=${needsSelectionRender}, selectedCell=${selectedCell ? 'есть' : 'нет'}`
-        );
+        resolve();
+      } catch (error) {
+        console.error('❌ Ошибка рендеринга сетки:', error);
+        reject(error);
       }
-    } catch (error) {
-      console.error('❌ Ошибка рендеринга сетки:', error);
-      throw error;
-    }
+    });
   }
 
   /**

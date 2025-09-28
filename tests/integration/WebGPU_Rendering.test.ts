@@ -9,7 +9,7 @@ import { RenderManager } from '../../src/rendering/webgpu-setup/RenderManager.js
 import { RenderPipelineBuilder } from '../../src/rendering/webgpu-setup/RenderPipelineBuilder.js';
 import type { WebGPUConfig, Cell, Viewport } from '../../src/types/index.js';
 
-describe('Sprint 2.1: WebGPU рендеринг', () => {
+describe('WebGPU рендеринг', () => {
   let mockConfig: WebGPUConfig;
   let mockCanvas: HTMLCanvasElement;
   let mockDevice: GPUDevice;
@@ -272,7 +272,7 @@ describe('Sprint 2.1: WebGPU рендеринг', () => {
     });
   });
 
-  describe('🎯 Sprint 2.1 Критерии готовности', () => {
+  describe('🎯 Критерии готовности WebGPU рендеринга', () => {
     it('должен отрисовывать сетку без ошибок', async () => {
       const gridRenderer = new GridRenderer(mockConfig, mockCanvas, 80, 25);
       await gridRenderer.initialize();

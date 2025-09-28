@@ -355,12 +355,12 @@ export class App {
   private startRendering(): void {
     console.log('🎨 Запуск рендеринга...');
 
-    const render = (currentTime: number) => {
+    const render = async (currentTime: number) => {
       this.updateFPS(currentTime);
 
       // Рендерим только если нужно
       if (this.needsRender) {
-        this.render();
+        await this.render();
         this.needsRender = false;
       }
 
@@ -389,7 +389,7 @@ export class App {
   /**
    * Рендеринг кадра
    */
-  private render(): void {
+  private async render(): Promise<void> {
     if (!this.isInitialized || !this.virtualGrid) return;
 
     // Получаем видимые ячейки
@@ -397,7 +397,7 @@ export class App {
 
     // Рендерим через WebGPU или Canvas 2D
     if (this.webgpuManager) {
-      this.renderWithWebGPU(visibleCells);
+      await this.renderWithWebGPU(visibleCells);
     } else {
       this.renderWithCanvas2D(visibleCells);
     }
@@ -406,7 +406,7 @@ export class App {
   /**
    * Рендеринг через WebGPU с использованием GridRenderer
    */
-  private renderWithWebGPU(cells: any[]): void {
+  private async renderWithWebGPU(cells: any[]): Promise<void> {
     if (!this.gridRenderer || !this.virtualGrid) return;
 
     try {
@@ -442,7 +442,7 @@ export class App {
       }
 
       // Рендерим через оптимизированный GridRenderer с выделением
-      this.gridRenderer.render(cells, viewport, selectedCellData);
+      await this.gridRenderer.render(cells, viewport, selectedCellData);
     } catch (error) {
       console.error('❌ Ошибка WebGPU рендеринга:', error);
       // Fallback на Canvas 2D
