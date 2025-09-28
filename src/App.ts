@@ -146,6 +146,9 @@ export class App {
     // Обработчики canvas
     this.setupCanvasHandlers();
 
+    // Обработчики клавиатуры
+    this.setupKeyboardHandlers();
+
     console.log('✅ Обработчики событий настроены');
   }
 
@@ -219,6 +222,21 @@ export class App {
   }
 
   /**
+   * Настройка обработчиков клавиатуры
+   */
+  private setupKeyboardHandlers(): void {
+    document.addEventListener('keydown', event => {
+      this.handleKeyDown(event);
+    });
+
+    // Обработка фокуса на canvas для навигации
+    this.canvas.tabIndex = 0; // Делаем canvas focusable
+    this.canvas.addEventListener('focus', () => {
+      console.log('🎯 Canvas получил фокус');
+    });
+  }
+
+  /**
    * Обработка действий панели инструментов
    */
   private handleToolbarAction(action: string | null): void {
@@ -283,16 +301,34 @@ export class App {
     if (cell) {
       this.virtualGrid.setActiveCell(cell);
       this.updateFormulaBar(cell);
-      this.updateCellInfo(cell);
+      this.updateStatusBar();
+
+      // Помечаем, что нужна перерисовка (выделение будет отрендерено в основном render)
+      this.needsRender = true;
     }
   }
 
   /**
    * Обработка движения мыши по canvas
    */
-  private handleCanvasMouseMove(_event: MouseEvent): void {
-    // Подсветка ячеек при наведении будет реализована в следующих спринтах
-    console.log('🖱️ Движение мыши по canvas');
+  private handleCanvasMouseMove(event: MouseEvent): void {
+    if (!this.virtualGrid) return;
+
+    const rect = this.canvas.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+
+    const cell = this.virtualGrid.getCellAtPosition(x, y);
+    if (cell) {
+      // Изменяем курсор на pointer при наведении на ячейку
+      this.canvas.style.cursor = 'pointer';
+
+      // Сохраняем информацию о ячейке под курсором
+      (this as any).hoveredCell = cell;
+    } else {
+      this.canvas.style.cursor = 'default';
+      (this as any).hoveredCell = null;
+    }
   }
 
   /**
@@ -377,8 +413,36 @@ export class App {
       // Получаем viewport для рендеринга
       const viewport = this.virtualGrid.getViewport();
 
-      // Рендерим через оптимизированный GridRenderer
-      this.gridRenderer.render(cells, viewport);
+      // Получаем активную ячейку для выделения
+      const activeCell = this.virtualGrid.getActiveCell();
+      let selectedCellData = null;
+
+      if (activeCell) {
+        selectedCellData = {
+          row: activeCell.row,
+          col: activeCell.col,
+          value: null,
+          screenX: (activeCell.col - viewport.startCol) * this.config.cellWidth,
+          screenY: (activeCell.row - viewport.startRow) * this.config.cellHeight,
+          width: this.config.cellWidth,
+          height: this.config.cellHeight,
+        };
+
+        const isVisible =
+          activeCell.col >= viewport.startCol &&
+          activeCell.col <= viewport.endCol &&
+          activeCell.row >= viewport.startRow &&
+          activeCell.row <= viewport.endRow;
+
+        console.log(
+          `🎯 APP ОТЛАДКА: activeCell=${JSON.stringify(activeCell)}, viewport=${JSON.stringify(viewport)}, selectedCellData=${JSON.stringify(selectedCellData)}, ВИДИМАЯ=${isVisible}`
+        );
+      } else {
+        console.log(`🎯 APP ОТЛАДКА: НЕТ АКТИВНОЙ ЯЧЕЙКИ!`);
+      }
+
+      // Рендерим через оптимизированный GridRenderer с выделением
+      this.gridRenderer.render(cells, viewport, selectedCellData);
     } catch (error) {
       console.error('❌ Ошибка WebGPU рендеринга:', error);
       // Fallback на Canvas 2D
@@ -436,7 +500,7 @@ export class App {
     // Обновляем статус-бар
     this.updateStatusBar();
 
-    // Помечаем, что нужна перерисовка
+    // Помечаем, что нужна перерисовка (включая выделение)
     this.needsRender = true;
   }
 
@@ -871,6 +935,155 @@ export class App {
         this.needsRender = true;
         console.log(`✅ Ячейка ${activeCell.row},${activeCell.col} очищена`);
       }
+    }
+  }
+
+  /**
+   * Обработка нажатий клавиш
+   */
+  private handleKeyDown(event: KeyboardEvent): void {
+    // Игнорируем если фокус на поле ввода формул
+    const formulaInput = document.getElementById('formula-input') as HTMLInputElement;
+    if (document.activeElement === formulaInput) {
+      return;
+    }
+
+    if (!this.virtualGrid) return;
+
+    const activeCell = this.virtualGrid.getActiveCell();
+    if (!activeCell) return;
+
+    let newRow = activeCell.row;
+    let newCol = activeCell.col;
+    let handled = false;
+
+    switch (event.key) {
+      case 'ArrowUp':
+        newRow = Math.max(0, activeCell.row - 1);
+        handled = true;
+        break;
+      case 'ArrowDown':
+        newRow = activeCell.row + 1;
+        handled = true;
+        break;
+      case 'ArrowLeft':
+        newCol = Math.max(0, activeCell.col - 1);
+        handled = true;
+        break;
+      case 'ArrowRight':
+        newCol = activeCell.col + 1;
+        handled = true;
+        break;
+      case 'Tab':
+        newCol = activeCell.col + 1;
+        handled = true;
+        break;
+      case 'Enter':
+        newRow = activeCell.row + 1;
+        handled = true;
+        break;
+      case 'Delete':
+      case 'Backspace':
+        this.clearCell();
+        handled = true;
+        break;
+      case 'F2':
+        // Начать редактирование ячейки
+        this.startCellEditing();
+        handled = true;
+        break;
+      default:
+        // Если нажата обычная клавиша, начинаем ввод текста
+        if (event.key.length === 1 && !event.ctrlKey && !event.altKey && !event.metaKey) {
+          this.startCellEditing(event.key);
+          handled = true;
+        }
+        break;
+    }
+
+    if (handled) {
+      event.preventDefault();
+
+      // Обновляем активную ячейку если координаты изменились
+      if (newRow !== activeCell.row || newCol !== activeCell.col) {
+        this.virtualGrid.setActiveCell({ row: newRow, col: newCol });
+        this.updateFormulaBar({ row: newRow, col: newCol });
+        this.updateStatusBar();
+        this.needsRender = true;
+
+        // Прокручиваем к ячейке если она вне видимости
+        this.scrollToCell(newRow, newCol);
+      }
+    }
+  }
+
+  /**
+   * Начать редактирование ячейки
+   */
+  private startCellEditing(initialValue?: string): void {
+    const formulaInput = document.getElementById('formula-input') as HTMLInputElement;
+    if (formulaInput) {
+      // Если передано начальное значение, очищаем поле и вставляем его
+      if (initialValue !== undefined) {
+        formulaInput.value = initialValue;
+      }
+
+      // Фокусируемся на поле формул
+      formulaInput.focus();
+      formulaInput.select();
+
+      console.log('✏️ Начато редактирование ячейки');
+    }
+  }
+
+  /**
+   * Прокрутка к указанной ячейке
+   */
+  private scrollToCell(row: number, col: number): void {
+    if (this.virtualGrid) {
+      const viewport = this.virtualGrid.getViewport();
+      let needsScroll = false;
+
+      // Проверяем нужна ли прокрутка
+      if (row < viewport.startRow || row >= viewport.endRow) {
+        needsScroll = true;
+      }
+      if (col < viewport.startCol || col >= viewport.endCol) {
+        needsScroll = true;
+      }
+
+      if (needsScroll) {
+        this.virtualGrid.scrollToCell(row, col);
+        this.needsRender = true;
+        console.log(`📊 Прокрутка к ячейке ${row},${col}`);
+      }
+    }
+  }
+
+  /**
+   * Рендеринг выделения ячейки
+   */
+  private async renderCellSelection(cell: { row: number; col: number }): Promise<void> {
+    if (!this.gridRenderer) return;
+
+    try {
+      // Создаем объект ячейки для рендеринга с абсолютными координатами
+      const viewport = this.virtualGrid!.getViewport();
+      const selectedCell = {
+        row: cell.row,
+        col: cell.col,
+        value: null,
+        // Абсолютные экранные координаты БЕЗ вычитания viewport offset
+        screenX: (cell.col - viewport.startCol) * this.config.cellWidth,
+        screenY: (cell.row - viewport.startRow) * this.config.cellHeight,
+        width: this.config.cellWidth,
+        height: this.config.cellHeight,
+      };
+
+      await this.gridRenderer.renderSelection(selectedCell);
+      console.log(`🎯 Выделена ячейка ${cell.row},${cell.col}`);
+    } catch (error) {
+      console.error('❌ Ошибка рендеринга выделения:', error);
     }
   }
 }

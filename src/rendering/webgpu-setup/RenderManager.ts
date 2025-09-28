@@ -20,6 +20,10 @@ export class RenderManager {
   private borderBindGroup: GPUBindGroup | null = null;
   private gridVertexBuffer: GPUBuffer | null = null;
 
+  // Буферы для выделения
+  private selectionUniformBuffer: GPUBuffer | null = null;
+  private selectionBindGroup: GPUBindGroup | null = null;
+
   private canvas: HTMLCanvasElement;
   private cellWidth: number;
   private cellHeight: number;
@@ -65,6 +69,13 @@ export class RenderManager {
         this.gridUniformBuffer
       );
 
+      // Создаем буферы для выделения
+      this.selectionUniformBuffer = this.pipelineBuilder.createSelectionUniformBuffer();
+      this.selectionBindGroup = this.pipelineBuilder.createSelectionBindGroup(
+        this.selectionPipeline,
+        this.selectionUniformBuffer
+      );
+
       // Создаем буфер вершин для квада (0,0) до (1,1)
       const vertices = new Float32Array([
         0.0,
@@ -100,7 +111,7 @@ export class RenderManager {
   /**
    * Рендеринг кадра
    */
-  render(visibleCells: any[], viewport: any): void {
+  render(visibleCells: any[], viewport: any, selectedCell?: any): void {
     if (!this.gridPipeline || !this.gridBindGroup) {
       console.warn('⚠️ Пайплайны не инициализированы');
       return;
@@ -145,6 +156,52 @@ export class RenderManager {
       }
       this.renderVisibleCells(renderPass, visibleCells);
 
+      // 3. Рендерим выделение если есть активная ячейка (В ТОМ ЖЕ RENDER PASS!)
+      if (
+        selectedCell &&
+        this.selectionPipeline &&
+        this.selectionBindGroup &&
+        this.selectionUniformBuffer
+      ) {
+        // Обновляем uniform буфер для выделения
+        const cellPosition: [number, number] = [selectedCell.screenX, selectedCell.screenY];
+        const cellSize: [number, number] = [this.cellWidth, this.cellHeight];
+        const viewportSize: [number, number] = [this.canvas.width, this.canvas.height];
+
+        console.log(`🎯 ОТЛАДКА ВЫДЕЛЕНИЯ:`, {
+          cellPosition,
+          cellSize,
+          viewportSize,
+          selectedCell: {
+            screenX: selectedCell.screenX,
+            screenY: selectedCell.screenY,
+            row: selectedCell.row,
+            col: selectedCell.col,
+          },
+          'КООРДИНАТЫ В NDC': {
+            x: (cellPosition[0] / viewportSize[0]) * 2.0 - 1.0,
+            y: 1.0 - (cellPosition[1] / viewportSize[1]) * 2.0,
+          },
+          'РАЗМЕР В NDC': {
+            width: (cellSize[0] / viewportSize[0]) * 2.0,
+            height: (cellSize[1] / viewportSize[1]) * 2.0,
+          },
+        });
+
+        this.pipelineBuilder.updateSelectionUniforms(
+          this.selectionUniformBuffer,
+          cellPosition,
+          cellSize,
+          viewportSize
+        );
+
+        renderPass.setPipeline(this.selectionPipeline);
+        renderPass.setBindGroup(0, this.selectionBindGroup);
+        renderPass.draw(6, 1, 0, 0); // Рендерим выделение (6 вершин для одного квада)
+
+        console.log(`🎯 Выделение отрендерено в основном render pass для позиции ${cellPosition}`);
+      }
+
       // Завершаем рендер-пасс
       renderPass.end();
 
@@ -187,45 +244,15 @@ export class RenderManager {
    * Рендеринг видимых ячеек с поддержкой instancing
    */
   private renderVisibleCells(renderPass: GPURenderPassEncoder, visibleCells: any[]): void {
-    const cellCount = visibleCells.length || 100;
+    const cellCount = visibleCells.length;
 
-    if (cellCount === 0) return;
+    if (cellCount === 0) {
+      return;
+    }
 
     // Используем instancing для эффективного рендеринга множества ячеек
     // Рендерим один квад (6 вершин) для каждой ячейки
     renderPass.draw(6, cellCount, 0, 0);
-  }
-
-  /**
-   * Рендеринг выделения ячейки
-   */
-  renderSelection(_selectedCell: any): void {
-    if (!this.selectionPipeline) return;
-
-    try {
-      const commandEncoder = this.device.createCommandEncoder();
-      const textureView = this.context.getCurrentTexture().createView();
-
-      const renderPass = commandEncoder.beginRenderPass({
-        colorAttachments: [
-          {
-            view: textureView,
-            loadOp: 'load', // Не очищаем, рисуем поверх
-            storeOp: 'store',
-          },
-        ],
-      });
-
-      renderPass.setPipeline(this.selectionPipeline);
-
-      // Рендерим выделение (6 вершин для одного квада)
-      renderPass.draw(6, 1, 0, 0);
-
-      renderPass.end();
-      this.device.queue.submit([commandEncoder.finish()]);
-    } catch (error) {
-      console.error('❌ Ошибка рендеринга выделения:', error);
-    }
   }
 
   /**

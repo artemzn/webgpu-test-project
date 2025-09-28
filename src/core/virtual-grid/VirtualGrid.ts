@@ -321,4 +321,18 @@ export class VirtualGrid {
       scrollPosition: { x: this.scrollX, y: this.scrollY },
     };
   }
+
+  /**
+   * Прокрутка к определенной ячейке
+   */
+  scrollToCell(row: number, col: number): void {
+    this.scrollTo(row, col);
+  }
+
+  /**
+   * Прокрутка к началу (A1)
+   */
+  scrollToHome(): void {
+    this.scrollTo(0, 0);
+  }
 }

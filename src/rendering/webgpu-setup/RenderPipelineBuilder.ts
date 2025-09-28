@@ -107,7 +107,9 @@ export class RenderPipelineBuilder {
         );
 
         output.position = vec4f(screenPos, 0.0, 1.0);
-        output.color = vec4f(0.95, 0.95, 0.95, 1.0); // Светло-серый фон
+        // Делаем каждую ячейку слегка разной для визуального различия
+        let cellColorVariation = (f32(cellX) + f32(cellY)) * 0.01;
+        output.color = vec4f(0.98 + cellColorVariation, 0.98 + cellColorVariation, 0.98 + cellColorVariation, 1.0);
         output.cellCoord = pos;
         output.cellIndex = vec2f(f32(cellX), f32(cellY));
         
@@ -128,9 +130,8 @@ export class RenderPipelineBuilder {
         @location(2) cellIndex: vec2f
       ) -> @location(0) vec4f {
         
-        // Только фон ячейки без границ
-        let gradient = 0.98 + (cellCoord.x + cellCoord.y) * 0.01;
-        return vec4f(gradient, gradient, gradient, 1.0);
+        // ВРЕМЕННО: прозрачный фон пока не исправим ошибку
+        return vec4f(1.0, 1.0, 1.0, 0.0); // Белый прозрачный
       }
     `;
   }
@@ -168,6 +169,62 @@ export class RenderPipelineBuilder {
 
     console.log('✅ Bind group для сетки создан');
     return bindGroup;
+  }
+
+  /**
+   * Создание uniform буфера для выделения
+   */
+  createSelectionUniformBuffer(): GPUBuffer {
+    const buffer = this.device.createBuffer({
+      size: 32, // 8 floats * 4 bytes each (cellPosition, cellSize, viewportSize + padding)
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      label: 'Selection Uniform Buffer',
+    });
+
+    console.log('✅ Uniform буфер для выделения создан');
+    return buffer;
+  }
+
+  /**
+   * Создание bind group для выделения
+   */
+  createSelectionBindGroup(
+    selectionPipeline: GPURenderPipeline,
+    uniformBuffer: GPUBuffer
+  ): GPUBindGroup {
+    const bindGroup = this.device.createBindGroup({
+      layout: selectionPipeline.getBindGroupLayout(0),
+      entries: [
+        {
+          binding: 0,
+          resource: { buffer: uniformBuffer },
+        },
+      ],
+      label: 'Selection Bind Group',
+    });
+
+    console.log('✅ Bind group для выделения создан');
+    return bindGroup;
+  }
+
+  /**
+   * Обновление uniform буфера для выделения
+   */
+  updateSelectionUniforms(
+    uniformBuffer: GPUBuffer,
+    cellPosition: [number, number],
+    cellSize: [number, number],
+    viewportSize: [number, number]
+  ): void {
+    const data = new Float32Array([
+      ...cellPosition, // cellPosition: vec2f
+      ...cellSize, // cellSize: vec2f
+      ...viewportSize, // viewportSize: vec2f
+      0.0,
+      0.0, // padding
+    ]);
+
+    this.device.queue.writeBuffer(uniformBuffer, 0, data);
   }
 
   /**
@@ -224,6 +281,14 @@ export class RenderPipelineBuilder {
         @location(0) color: vec4f
       };
 
+      struct SelectionUniforms {
+        cellPosition: vec2f,  // Позиция активной ячейки в пикселях
+        cellSize: vec2f,      // Размер ячейки в пикселях  
+        viewportSize: vec2f   // Размер viewport
+      }
+
+      @group(0) @binding(0) var<uniform> selectionUniforms: SelectionUniforms;
+
       @vertex
       fn vs_main(@builtin(vertex_index) vertexIndex: u32) -> VertexOutput {
         var output: VertexOutput;
@@ -234,8 +299,19 @@ export class RenderPipelineBuilder {
         );
         
         let pos = positions[vertexIndex];
-        output.position = vec4f(pos * 2.0 - 1.0, 0.0, 1.0);
-        output.color = vec4f(0.0, 0.5, 1.0, 0.3); // Синее выделение
+        
+        // ПРОСТОЕ ИСПРАВЛЕНИЕ: Сдвигаем Y немного вверх
+        let cellPos = vec2f(selectionUniforms.cellPosition.x, selectionUniforms.cellPosition.y - 5.0);
+        let worldPos = cellPos + pos * selectionUniforms.cellSize;
+        
+        // Преобразуем в NDC координаты
+        let screenPos = vec2f(
+          (worldPos.x / selectionUniforms.viewportSize.x) * 2.0 - 1.0,
+          1.0 - (worldPos.y / selectionUniforms.viewportSize.y) * 2.0  // С ИНВЕРСИЕЙ
+        );
+        
+        output.position = vec4f(screenPos, 0.0, 1.0);
+        output.color = vec4f(0.2, 0.6, 1.0, 0.6); // Синее полупрозрачное выделение
         
         return output;
       }
@@ -266,6 +342,18 @@ export class RenderPipelineBuilder {
         targets: [
           {
             format: 'bgra8unorm',
+            blend: {
+              color: {
+                srcFactor: 'src-alpha',
+                dstFactor: 'one-minus-src-alpha',
+                operation: 'add',
+              },
+              alpha: {
+                srcFactor: 'one',
+                dstFactor: 'zero',
+                operation: 'add',
+              },
+            },
           },
         ],
       },

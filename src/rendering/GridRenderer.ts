@@ -56,20 +56,28 @@ export class GridRenderer {
   /**
    * Рендеринг сетки
    */
-  async render(visibleCells: Cell[], viewport: Viewport): Promise<void> {
+  render(visibleCells: Cell[], viewport: Viewport, selectedCell?: any): void {
     try {
       // Проверяем, нужно ли перерисовывать
-      if (!this.needsRedraw && this.viewportUnchanged(viewport)) {
-        return;
+      const needsMainRender = this.needsRedraw || !this.viewportUnchanged(viewport);
+      const needsSelectionRender = selectedCell !== null;
+
+      // ВСЕГДА рендерим если есть выделение или нужен основной рендер
+      if (needsMainRender || needsSelectionRender) {
+        // Обновляем кеш только при основном рендере
+        if (needsMainRender) {
+          this.lastViewport = { ...viewport };
+          this.lastVisibleCells = [...visibleCells];
+          this.needsRedraw = false;
+        }
+
+        // Рендерим через RenderManager с выделением в том же render pass
+        this.renderManager.render(visibleCells, viewport, selectedCell);
+
+        console.log(
+          `🎯 GridRenderer: needsMainRender=${needsMainRender}, needsSelectionRender=${needsSelectionRender}, selectedCell=${selectedCell ? 'есть' : 'нет'}`
+        );
       }
-
-      // Обновляем кеш
-      this.lastViewport = { ...viewport };
-      this.lastVisibleCells = [...visibleCells];
-      this.needsRedraw = false;
-
-      // Рендерим через RenderManager
-      this.renderManager.render(visibleCells, viewport);
     } catch (error) {
       console.error('❌ Ошибка рендеринга сетки:', error);
       throw error;
