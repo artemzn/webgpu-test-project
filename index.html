@@ -255,6 +255,8 @@
         <!-- Контейнер таблицы -->
         <div class="spreadsheet-container">
             <canvas id="spreadsheet-canvas" data-testid="spreadsheet-canvas"></canvas>
+            <!-- Overlay canvas для заголовков -->
+            <canvas id="headers-canvas" style="position: absolute; top: 0; left: 0; pointer-events: none; z-index: 10;"></canvas>
             <div id="loading" class="loading" style="display: none;">
                 Инициализация WebGPU...
             </div>

@@ -6,6 +6,7 @@ import type { AppConfig, InitializationResult } from './types/index.js';
 import { WebGPUDeviceManager } from './rendering/webgpu-setup/DeviceManager.js';
 import { RenderManager } from './rendering/webgpu-setup/RenderManager.js';
 import { GridRenderer } from './rendering/GridRenderer.js';
+import { HeaderRenderer } from './rendering/HeaderRenderer.js';
 import { VirtualGrid } from './core/virtual-grid/VirtualGrid.js';
 import { SparseMatrix } from './core/sparse-matrix/SparseMatrix.js';
 
@@ -15,6 +16,7 @@ export class App {
   private webgpuManager: WebGPUDeviceManager | null = null;
   private renderManager: RenderManager | null = null;
   private gridRenderer: GridRenderer | null = null;
+  private headerRenderer: HeaderRenderer | null = null;
   private virtualGrid: VirtualGrid | null = null;
   private sparseMatrix: SparseMatrix | null = null;
   private isInitialized = false;
@@ -98,6 +100,19 @@ export class App {
       this.config.cellHeight
     );
     await this.gridRenderer.initialize();
+
+    // Создаем HeaderRenderer для заголовков столбцов и строк
+    const headersCanvas = document.getElementById('headers-canvas') as HTMLCanvasElement;
+    if (headersCanvas) {
+      this.headerRenderer = new HeaderRenderer(
+        headersCanvas,
+        this.config.cellWidth,
+        this.config.cellHeight
+      );
+      console.log('✅ HeaderRenderer инициализирован');
+    } else {
+      console.warn('⚠️ headers-canvas не найден, заголовки будут отключены');
+    }
 
     console.log('✅ WebGPU, рендер-пайплайн и GridRenderer успешно инициализированы');
   }
@@ -457,6 +472,11 @@ export class App {
 
       // Рендерим через оптимизированный GridRenderer с выделением
       await this.gridRenderer.render(cells, viewport, selectedCellData);
+
+      // Рендерим заголовки столбцов и строк
+      if (this.headerRenderer) {
+        this.headerRenderer.render(viewport);
+      }
     } catch (error) {
       console.error('❌ Ошибка WebGPU рендеринга:', error);
       // Fallback на Canvas 2D
@@ -643,11 +663,23 @@ export class App {
         this.canvas.width = width;
         this.canvas.height = height;
 
+        // Синхронизируем размер headers canvas
+        const headersCanvas = document.getElementById('headers-canvas') as HTMLCanvasElement;
+        if (headersCanvas) {
+          headersCanvas.width = width;
+          headersCanvas.height = height;
+        }
+
         console.log(`📐 Canvas размер обновлен: ${width}x${height}`);
 
         // Обновляем виртуальную сетку
         if (this.virtualGrid) {
           this.virtualGrid.updateCanvasSize(width, height);
+        }
+
+        // Обновляем HeaderRenderer
+        if (this.headerRenderer) {
+          this.headerRenderer.updateCanvasSize(width, height);
         }
 
         // Помечаем, что нужна перерисовка

@@ -9,6 +9,9 @@ dist/
 build/
 *.tsbuildinfo
 
+test-canvas-headers.html
+test-headers.html
+
 # Vite cache
 .vite/
 

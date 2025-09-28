@@ -208,6 +208,59 @@ export class RenderPipelineBuilder {
   }
 
   /**
+   * Создание uniform буфера для заголовков
+   */
+  createHeaderUniformBuffer(): GPUBuffer {
+    const buffer = this.device.createBuffer({
+      size: 32, // 3 * vec2f * 4 bytes + padding
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
+
+    console.log('✅ Uniform буфер для заголовков создан');
+    return buffer;
+  }
+
+  /**
+   * Создание bind group для заголовков
+   */
+  createHeaderBindGroup(pipeline: GPURenderPipeline, uniformBuffer: GPUBuffer): GPUBindGroup {
+    const bindGroup = this.device.createBindGroup({
+      layout: pipeline.getBindGroupLayout(0),
+      entries: [
+        {
+          binding: 0,
+          resource: {
+            buffer: uniformBuffer,
+          },
+        },
+      ],
+    });
+
+    console.log('✅ Bind group для заголовков создан');
+    return bindGroup;
+  }
+
+  /**
+   * Обновление uniform буфера для заголовков (ТОЧНО КАК У ВЫДЕЛЕНИЯ!)
+   */
+  updateHeaderUniforms(
+    uniformBuffer: GPUBuffer,
+    cellPosition: [number, number], // ТОЧНО КАК У ВЫДЕЛЕНИЯ!
+    cellSize: [number, number], // ТОЧНО КАК У ВЫДЕЛЕНИЯ!
+    viewportSize: [number, number]
+  ): void {
+    const data = new Float32Array([
+      ...cellPosition, // cellPosition: vec2f (ТОЧНО КАК У ВЫДЕЛЕНИЯ!)
+      ...cellSize, // cellSize: vec2f (ТОЧНО КАК У ВЫДЕЛЕНИЯ!)
+      ...viewportSize, // viewportSize: vec2f
+      0.0,
+      0.0, // padding
+    ]);
+
+    this.device.queue.writeBuffer(uniformBuffer, 0, data);
+  }
+
+  /**
    * Обновление uniform буфера для выделения
    */
   updateSelectionUniforms(
@@ -267,6 +320,99 @@ export class RenderPipelineBuilder {
     // Пока что возвращаем простой пайплайн
     // В будущем здесь будет полноценный текст-рендеринг
     return this.createGridPipeline();
+  }
+
+  /**
+   * Создание пайплайна для отрисовки заголовков (A, B, C... и 1, 2, 3...)
+   */
+  createHeaderPipeline(): GPURenderPipeline {
+    console.log('🔧 Создание пайплайна для заголовков...');
+
+    // КОПИРУЕМ ТОЧНО КАК У ВЫДЕЛЕНИЯ!
+    const vertexShader = `
+      struct VertexOutput {
+        @builtin(position) position: vec4f,
+        @location(0) color: vec4f
+      };
+
+      struct HeaderUniforms {
+        cellPosition: vec2f,  // Позиция заголовка в пикселях (ТОЧНО КАК У ВЫДЕЛЕНИЯ!)
+        cellSize: vec2f,      // Размер заголовка в пикселях (ТОЧНО КАК У ВЫДЕЛЕНИЯ!)
+        viewportSize: vec2f   // Размер viewport
+      }
+
+      @group(0) @binding(0) var<uniform> headerUniforms: HeaderUniforms;
+
+      @vertex
+      fn vs_main(@builtin(vertex_index) vertexIndex: u32) -> VertexOutput {
+        var output: VertexOutput;
+        
+        let positions = array<vec2f, 6>(
+          vec2f(0.0, 0.0), vec2f(1.0, 0.0), vec2f(0.0, 1.0),
+          vec2f(0.0, 1.0), vec2f(1.0, 0.0), vec2f(1.0, 1.0)
+        );
+        
+        let pos = positions[vertexIndex];
+        
+        // БЕЗ ДОПОЛНИТЕЛЬНЫХ ОТСТУПОВ - они уже в координатах!
+        let cellPos = vec2f(
+          headerUniforms.cellPosition.x, // Координаты уже с отступами
+          headerUniforms.cellPosition.y  // Координаты уже с отступами
+        );
+        let worldPos = cellPos + pos * headerUniforms.cellSize;
+        
+        // Преобразуем в NDC координаты КАК В GRID SHADER
+        let screenPos = vec2f(
+          (worldPos.x / headerUniforms.viewportSize.x) * 2.0 - 1.0,
+          (worldPos.y / headerUniforms.viewportSize.y) * 2.0 - 1.0  // БЕЗ ИНВЕРСИИ КАК В GRID!
+        );
+        
+        output.position = vec4f(screenPos, -0.1, 1.0); // БЛИЖЕ К КАМЕРЕ!
+        output.color = vec4f(1.0, 0.0, 0.0, 1.0); // ЯРКО-КРАСНЫЙ для отладки
+        
+        return output;
+      }
+    `;
+
+    const fragmentShader = `
+      @fragment
+      fn fs_main(@location(0) color: vec4f) -> @location(0) vec4f {
+        return color;
+      }
+    `;
+
+    console.log('🔍 СОЗДАЕМ SHADER MODULE ДЛЯ ЗАГОЛОВКОВ...');
+    const shaderModule = this.device.createShaderModule({
+      code: `${vertexShader}\n\n${fragmentShader}`,
+      label: 'Header Pipeline Shader',
+    });
+    console.log('✅ SHADER MODULE ДЛЯ ЗАГОЛОВКОВ СОЗДАН');
+
+    const pipeline = this.device.createRenderPipeline({
+      layout: 'auto',
+      vertex: {
+        module: shaderModule,
+        entryPoint: 'vs_main',
+        buffers: [], // НЕ НУЖЕН vertex buffer - используем только vertex_index
+      },
+      fragment: {
+        module: shaderModule,
+        entryPoint: 'fs_main',
+        targets: [
+          {
+            format: 'bgra8unorm',
+            // БЕЗ BLENDING - заголовки непрозрачные
+          },
+        ],
+      },
+      primitive: {
+        topology: 'triangle-list',
+      },
+      // БЕЗ DEPTH TEST ДЛЯ ЗАГОЛОВКОВ!
+    });
+
+    console.log('✅ Пайплайн для заголовков создан');
+    return pipeline;
   }
 
   /**
