@@ -35,6 +35,9 @@ export class App {
    */
   async initialize(): Promise<void> {
     try {
+      // 0. Настраиваем размер canvas
+      this.setupCanvas();
+
       // 1. Проверяем поддержку WebGPU
       if (this.config.enableWebGPU) {
         await this.initializeWebGPU();
@@ -481,6 +484,55 @@ export class App {
       throw new Error('Canvas элемент не найден');
     }
     return canvas;
+  }
+
+  /**
+   * Настройка размера canvas
+   */
+  private setupCanvas(): void {
+    const container = this.canvas.parentElement;
+    if (!container) return;
+
+    // Получаем размеры контейнера
+    const containerRect = container.getBoundingClientRect();
+    const width = containerRect.width;
+    const height = containerRect.height;
+
+    // Устанавливаем размеры canvas
+    this.canvas.width = width;
+    this.canvas.height = height;
+
+    console.log(`📐 Canvas размер установлен: ${width}x${height}`);
+
+    // Добавляем обработчик изменения размера окна
+    window.addEventListener('resize', () => {
+      this.updateCanvasSize();
+    });
+  }
+
+  /**
+   * Обновление размера canvas при изменении размера окна
+   */
+  private updateCanvasSize(): void {
+    const container = this.canvas.parentElement;
+    if (!container) return;
+
+    const containerRect = container.getBoundingClientRect();
+    const width = containerRect.width;
+    const height = containerRect.height;
+
+    this.canvas.width = width;
+    this.canvas.height = height;
+
+    console.log(`📐 Canvas размер обновлен: ${width}x${height}`);
+
+    // Обновляем виртуальную сетку
+    if (this.virtualGrid) {
+      this.virtualGrid.updateCanvasSize(width, height);
+    }
+
+    // Помечаем, что нужна перерисовка
+    this.needsRender = true;
   }
 
   // Методы для обработки действий (заглушки)
