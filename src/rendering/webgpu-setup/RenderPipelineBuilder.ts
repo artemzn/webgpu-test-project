@@ -300,8 +300,11 @@ export class RenderPipelineBuilder {
         
         let pos = positions[vertexIndex];
         
-        // ПРОСТОЕ ИСПРАВЛЕНИЕ: Сдвигаем Y немного вверх
-        let cellPos = vec2f(selectionUniforms.cellPosition.x, selectionUniforms.cellPosition.y - 5.0);
+        // Добавляем отступы СЛЕВА и СВЕРХУ как в основной сетке
+        let cellPos = vec2f(
+          selectionUniforms.cellPosition.x + 30.0, // +30px СЛЕВА для номеров строк
+          selectionUniforms.cellPosition.y + 25.0 - 5.0  // +25px СВЕРХУ для заголовков - 5px коррекция
+        );
         let worldPos = cellPos + pos * selectionUniforms.cellSize;
         
         // Преобразуем в NDC координаты

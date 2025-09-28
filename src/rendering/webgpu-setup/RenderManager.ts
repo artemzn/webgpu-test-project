@@ -221,8 +221,8 @@ export class RenderManager {
     const gridSize: [number, number] = [this.cellWidth, this.cellHeight]; // Размер ячейки из конфига
     const cellSize: [number, number] = [this.cellWidth, this.cellHeight];
     const viewportOffset: [number, number] = [
-      0, // Всегда начинаем с (0,0) для левого верхнего угла
-      0,
+      30, // +30px отступ СЛЕВА для номеров строк
+      0, // СВЕРХУ пока ничего
     ];
     const viewportSize: [number, number] = [this.canvas.width, this.canvas.height];
     const totalCells: [number, number] = [

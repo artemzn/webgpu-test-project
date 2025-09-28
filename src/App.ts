@@ -294,8 +294,22 @@ export class App {
     if (!this.virtualGrid) return;
 
     const rect = this.canvas.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
+    let x = event.clientX - rect.left;
+    let y = event.clientY - rect.top;
+
+    // Корректируем клик с учетом отступов СЛЕВА и СВЕРХУ
+    const headerWidth = 30; // Ширина номеров строк
+    const headerHeight = 25; // Высота заголовков столбцов
+
+    // Проверяем клик по областям заголовков (игнорируем)
+    if (x < headerWidth || y < headerHeight) {
+      console.log('🏷️ Клик по заголовкам - игнорируем');
+      return;
+    }
+
+    // Корректируем координаты для основной сетки
+    x -= headerWidth;
+    y -= headerHeight;
 
     const cell = this.virtualGrid.getCellAtPosition(x, y);
     if (cell) {
