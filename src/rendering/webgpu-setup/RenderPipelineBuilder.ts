@@ -91,17 +91,22 @@ export class RenderPipelineBuilder {
         let cellX = instanceIndex % cellsPerRow;
         let cellY = instanceIndex / cellsPerRow;
         
-        // Преобразуем в экранные координаты
+        // Преобразуем в экранные координаты (пиксели)
         let worldPos = vec2f(
           f32(cellX) * gridUniforms.cellSize.x + gridUniforms.viewportOffset.x,
           f32(cellY) * gridUniforms.cellSize.y + gridUniforms.viewportOffset.y
         );
-        
-        // Масштабируем позицию вершины относительно ячейки
+
+        // Масштабируем позицию вершины относительно ячейки и нормализуем в NDC
         let scaledPos = pos * gridUniforms.cellSize;
         let finalPos = worldPos + scaledPos;
-        
-        output.position = vec4f(finalPos, 0.0, 1.0);
+
+        let screenPos = vec2f(
+          (finalPos.x / gridUniforms.viewportSize.x) * 2.0 - 1.0,
+          (finalPos.y / gridUniforms.viewportSize.y) * 2.0 - 1.0
+        );
+
+        output.position = vec4f(screenPos, 0.0, 1.0);
         output.color = vec4f(0.95, 0.95, 0.95, 1.0); // Светло-серый фон
         output.cellCoord = pos;
         output.cellIndex = vec2f(f32(cellX), f32(cellY));
@@ -123,19 +128,8 @@ export class RenderPipelineBuilder {
         @location(2) cellIndex: vec2f
       ) -> @location(0) vec4f {
         
-        // Оптимизированное рисование границ ячеек
-        let borderWidth = 0.01;
-        let isBorder = (cellCoord.x < borderWidth) || 
-                      (cellCoord.x > 1.0 - borderWidth) ||
-                      (cellCoord.y < borderWidth) || 
-                      (cellCoord.y > 1.0 - borderWidth);
-        
-        if (isBorder) {
-          return vec4f(0.8, 0.8, 0.8, 1.0); // Светло-серые границы
-        }
-        
-        // Основной цвет ячейки с легким градиентом для глубины
-        let gradient = 0.95 + (cellCoord.x + cellCoord.y) * 0.02;
+        // Только фон ячейки без границ
+        let gradient = 0.98 + (cellCoord.x + cellCoord.y) * 0.01;
         return vec4f(gradient, gradient, gradient, 1.0);
       }
     `;
@@ -282,6 +276,146 @@ export class RenderPipelineBuilder {
     });
 
     console.log('✅ Пайплайн для выделения создан');
+    return pipeline;
+  }
+
+  /**
+   * Создание пайплайна для отрисовки границ ячеек
+   */
+  createBorderPipeline(): GPURenderPipeline {
+    console.log('🔧 Создание пайплайна для границ...');
+
+    const vertexShader = `
+      struct VertexOutput {
+        @builtin(position) position: vec4f,
+        @location(0) cellCoord: vec2f,
+        @location(1) cellIndex: vec2f
+      };
+
+      struct GridUniforms {
+        gridSize: vec2f,
+        cellSize: vec2f,
+        viewportOffset: vec2f,
+        viewportSize: vec2f,
+        totalCells: vec2f
+      }
+
+      @group(0) @binding(0) var<uniform> gridUniforms: GridUniforms;
+
+      @vertex
+      fn vs_main(
+        @location(0) position: vec2f,
+        @builtin(instance_index) instanceIndex: u32
+      ) -> VertexOutput {
+        var output: VertexOutput;
+
+        // Вычисляем позицию ячейки на основе instance_index
+        let cellsPerRow = u32(gridUniforms.totalCells.x);
+        let cellX = instanceIndex % cellsPerRow;
+        let cellY = instanceIndex / cellsPerRow;
+
+        // Преобразуем в экранные координаты (пиксели)
+        let worldPos = vec2f(
+          f32(cellX) * gridUniforms.cellSize.x + gridUniforms.viewportOffset.x,
+          f32(cellY) * gridUniforms.cellSize.y + gridUniforms.viewportOffset.y
+        );
+
+        // Масштабируем позицию вершины относительно ячейки
+        let scaledPos = position * gridUniforms.cellSize;
+        let finalPos = worldPos + scaledPos;
+
+        // Преобразуем в нормализованные координаты экрана (-1 до 1)
+        let screenPos = vec2f(
+          (finalPos.x / gridUniforms.viewportSize.x) * 2.0 - 1.0,
+          (finalPos.y / gridUniforms.viewportSize.y) * 2.0 - 1.0
+        );
+
+        output.position = vec4f(screenPos, 0.0, 1.0);
+        output.cellCoord = position;
+        output.cellIndex = vec2f(f32(cellX), f32(cellY));
+
+        return output;
+      }
+    `;
+
+    const fragmentShader = `
+      @fragment
+      fn fs_main(
+        @location(0) cellCoord: vec2f,
+        @location(1) cellIndex: vec2f
+      ) -> @location(0) vec4f {
+        
+        // Рисуем границы с толщиной 1px: правые/нижние всегда,
+        // верх/лево только для первой строки/колонки
+        let borderPx = 1.0;
+        let normalizedBorderX = borderPx / gridUniforms.cellSize.x;
+        let normalizedBorderY = borderPx / gridUniforms.cellSize.y;
+
+        let isRightBorder = cellCoord.x > 1.0 - normalizedBorderX;
+        let isBottomBorder = cellCoord.y > 1.0 - normalizedBorderY;
+        let isTopBorder = (cellIndex.y == 0.0) && (cellCoord.y < normalizedBorderY);
+        let isLeftBorder = (cellIndex.x == 0.0) && (cellCoord.x < normalizedBorderX);
+
+        if (isRightBorder || isBottomBorder || isTopBorder || isLeftBorder) {
+          return vec4f(0.0, 0.0, 0.0, 1.0);
+        }
+
+        // Прозрачный фон для границ
+        return vec4f(0.0, 0.0, 0.0, 0.0);
+      }
+    `;
+
+    const shaderModule = this.device.createShaderModule({
+      code: vertexShader + fragmentShader,
+      label: 'Border Shader Module',
+    });
+
+    const pipeline = this.device.createRenderPipeline({
+      layout: 'auto',
+      vertex: {
+        module: shaderModule,
+        entryPoint: 'vs_main',
+        buffers: [
+          {
+            arrayStride: 8, // 2 floats * 4 bytes
+            attributes: [
+              {
+                format: 'float32x2',
+                offset: 0,
+                shaderLocation: 0,
+              },
+            ],
+          },
+        ],
+      },
+      fragment: {
+        module: shaderModule,
+        entryPoint: 'fs_main',
+        targets: [
+          {
+            format: 'bgra8unorm',
+            blend: {
+              color: {
+                srcFactor: 'src-alpha',
+                dstFactor: 'one-minus-src-alpha',
+                operation: 'add',
+              },
+              alpha: {
+                srcFactor: 'src-alpha',
+                dstFactor: 'one-minus-src-alpha',
+                operation: 'add',
+              },
+            },
+          },
+        ],
+      },
+      primitive: {
+        topology: 'triangle-list',
+      },
+      label: 'Border Render Pipeline',
+    });
+
+    console.log('✅ Пайплайн для границ создан');
     return pipeline;
   }
 }
