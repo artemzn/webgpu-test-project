@@ -69,7 +69,7 @@ export class GridRenderer {
       this.needsRedraw = false;
 
       // Рендерим через RenderManager
-      await this.renderManager.render(visibleCells, viewport);
+      this.renderManager.render(visibleCells, viewport);
     } catch (error) {
       console.error('❌ Ошибка рендеринга сетки:', error);
       throw error;

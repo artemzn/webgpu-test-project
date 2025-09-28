@@ -82,7 +82,12 @@ export class App {
     }
 
     // Создаем менеджер рендеринга
-    this.renderManager = new RenderManager(result.config, this.canvas);
+    this.renderManager = new RenderManager(
+      result.config,
+      this.canvas,
+      this.config.cellWidth,
+      this.config.cellHeight
+    );
     await this.renderManager.initialize();
 
     // Создаем GridRenderer для оптимизированного рендеринга сетки

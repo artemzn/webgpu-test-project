@@ -38,9 +38,9 @@ export class VirtualGrid {
     // Инициализируем viewport
     this.viewport = {
       startRow: 0,
-      endRow: Math.ceil(canvasHeight / cellHeight),
+      endRow: Math.ceil(canvasHeight / cellHeight) + 1,
       startCol: 0,
-      endCol: Math.ceil(canvasWidth / cellWidth),
+      endCol: Math.ceil(canvasWidth / cellWidth) + 1,
     };
 
     console.log('📊 Виртуальная сетка инициализирована:', {
@@ -243,14 +243,16 @@ export class VirtualGrid {
    * Получение количества видимых строк
    */
   private getVisibleRows(): number {
-    return Math.ceil(this.canvasHeight / this.cellHeight);
+    // +1 строка, чтобы верхняя/нижняя границы всегда были видны внутри вьюпорта
+    return Math.ceil(this.canvasHeight / this.cellHeight) + 1;
   }
 
   /**
    * Получение количества видимых столбцов
    */
   private getVisibleCols(): number {
-    return Math.ceil(this.canvasWidth / this.cellWidth);
+    // +1 колонка, чтобы правая граница была внутри вьюпорта и не клипалась
+    return Math.ceil(this.canvasWidth / this.cellWidth) + 1;
   }
 
   /**

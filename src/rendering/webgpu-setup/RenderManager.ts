@@ -21,11 +21,20 @@ export class RenderManager {
   private gridVertexBuffer: GPUBuffer | null = null;
 
   private canvas: HTMLCanvasElement;
+  private cellWidth: number;
+  private cellHeight: number;
 
-  constructor(config: WebGPUConfig, canvas: HTMLCanvasElement) {
+  constructor(
+    config: WebGPUConfig,
+    canvas: HTMLCanvasElement,
+    cellWidth: number = 80,
+    cellHeight: number = 25
+  ) {
     this.device = config.device;
     this.context = config.context;
     this.canvas = canvas;
+    this.cellWidth = cellWidth;
+    this.cellHeight = cellHeight;
 
     this.pipelineBuilder = new RenderPipelineBuilder(this.device);
 
@@ -152,11 +161,11 @@ export class RenderManager {
   private updateGridUniforms(viewport: any): void {
     if (!this.gridUniformBuffer) return;
 
-    const gridSize: [number, number] = [80, 25]; // Размер ячейки
-    const cellSize: [number, number] = [80, 25];
+    const gridSize: [number, number] = [this.cellWidth, this.cellHeight]; // Размер ячейки из конфига
+    const cellSize: [number, number] = [this.cellWidth, this.cellHeight];
     const viewportOffset: [number, number] = [
-      -viewport.startCol * cellSize[0], // Отрицательный offset для сдвига
-      -viewport.startRow * cellSize[1],
+      0, // Всегда начинаем с (0,0) для левого верхнего угла
+      0,
     ];
     const viewportSize: [number, number] = [this.canvas.width, this.canvas.height];
     const totalCells: [number, number] = [
