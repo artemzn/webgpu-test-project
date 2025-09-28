@@ -238,6 +238,8 @@
             <div style="width: 1px; height: 24px; background: #e0e0e0; margin: 0 8px;"></div>
             <button class="toolbar-button" data-action="copy">📋 Копировать</button>
             <button class="toolbar-button" data-action="paste">📋 Вставить</button>
+            <div style="width: 1px; height: 24px; background: #e0e0e0; margin: 0 8px;"></div>
+            <button class="toolbar-button" data-action="test-1000x1000" style="background: #fff3e0; border-color: #ff9800;">🧪 Тест 1000x1000</button>
         </div>
         
         <!-- Панель формул -->
@@ -257,6 +259,8 @@
             <canvas id="spreadsheet-canvas" data-testid="spreadsheet-canvas"></canvas>
             <!-- Overlay canvas для заголовков -->
             <canvas id="headers-canvas" style="position: absolute; top: 0; left: 0; pointer-events: none; z-index: 10;"></canvas>
+            <!-- Overlay canvas для текста -->
+            <canvas id="text-canvas" style="position: absolute; top: 0; left: 0; pointer-events: none; z-index: 5;"></canvas>
             <div id="loading" class="loading" style="display: none;">
                 Инициализация WebGPU...
             </div>

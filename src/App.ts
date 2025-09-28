@@ -7,6 +7,7 @@ import { WebGPUDeviceManager } from './rendering/webgpu-setup/DeviceManager.js';
 import { RenderManager } from './rendering/webgpu-setup/RenderManager.js';
 import { GridRenderer } from './rendering/GridRenderer.js';
 import { HeaderRenderer } from './rendering/HeaderRenderer.js';
+import { TextRenderer } from './rendering/TextRenderer.js';
 import { VirtualGrid } from './core/virtual-grid/VirtualGrid.js';
 import { SparseMatrix } from './core/sparse-matrix/SparseMatrix.js';
 
@@ -17,6 +18,7 @@ export class App {
   private renderManager: RenderManager | null = null;
   private gridRenderer: GridRenderer | null = null;
   private headerRenderer: HeaderRenderer | null = null;
+  private textRenderer: TextRenderer | null = null;
   private virtualGrid: VirtualGrid | null = null;
   private sparseMatrix: SparseMatrix | null = null;
   private isInitialized = false;
@@ -114,6 +116,19 @@ export class App {
       console.warn('⚠️ headers-canvas не найден, заголовки будут отключены');
     }
 
+    // Создаем TextRenderer для текста в ячейках
+    const textCanvas = document.getElementById('text-canvas') as HTMLCanvasElement;
+    if (textCanvas) {
+      this.textRenderer = new TextRenderer(
+        textCanvas,
+        this.config.cellWidth,
+        this.config.cellHeight
+      );
+      console.log('✅ TextRenderer инициализирован');
+    } else {
+      console.warn('⚠️ text-canvas не найден, текст будет отключен');
+    }
+
     console.log('✅ WebGPU, рендер-пайплайн и GridRenderer успешно инициализированы');
   }
 
@@ -144,6 +159,142 @@ export class App {
     this.sparseMatrix = new SparseMatrix();
 
     console.log('✅ Разреженная матрица инициализирована');
+
+    // ДОБАВЛЯЕМ ТЕСТОВЫЕ ДАННЫЕ для демонстрации текста
+    this.addTestData();
+  }
+
+  /**
+   * Добавление тестовых данных для демонстрации
+   */
+  private addTestData(): void {
+    if (!this.sparseMatrix) return;
+
+    console.log('📝 Добавление тестовых данных...');
+
+    // Заголовки и примеры данных
+    this.sparseMatrix.setCell(0, 0, 'Имя');
+    this.sparseMatrix.setCell(0, 1, 'Возраст');
+    this.sparseMatrix.setCell(0, 2, 'Город');
+    this.sparseMatrix.setCell(0, 3, 'Зарплата');
+
+    // Тестовые строки
+    this.sparseMatrix.setCell(1, 0, 'Иван Петров');
+    this.sparseMatrix.setCell(1, 1, '25');
+    this.sparseMatrix.setCell(1, 2, 'Москва');
+    this.sparseMatrix.setCell(1, 3, '50000');
+
+    this.sparseMatrix.setCell(2, 0, 'Анна Сидорова');
+    this.sparseMatrix.setCell(2, 1, '30');
+    this.sparseMatrix.setCell(2, 2, 'СПб');
+    this.sparseMatrix.setCell(2, 3, '60000');
+
+    this.sparseMatrix.setCell(3, 0, 'Петр Иванов');
+    this.sparseMatrix.setCell(3, 1, '28');
+    this.sparseMatrix.setCell(3, 2, 'Казань');
+    this.sparseMatrix.setCell(3, 3, '45000');
+
+    // Формулы для демонстрации
+    this.sparseMatrix.setCell(5, 0, 'Итого:');
+    this.sparseMatrix.setCell(5, 3, '=SUM(D2:D4)');
+
+    // Длинный текст для тестирования обрезки
+    this.sparseMatrix.setCell(7, 0, 'Очень длинный текст который не поместится в ячейку');
+    this.sparseMatrix.setCell(7, 1, 'Короткий');
+
+    console.log('✅ Тестовые данные добавлены');
+  }
+
+  /**
+   * Генерация тестовых данных 1000x1000 для проверки производительности
+   */
+  private generateTestData1000x1000(): void {
+    if (!this.sparseMatrix) return;
+
+    console.log('🧪 Генерация тестовых данных 1000x1000...');
+
+    const startTime = performance.now();
+    let cellsGenerated = 0;
+
+    // Показываем прогресс
+    const statusText = document.getElementById('status-text');
+    if (statusText) {
+      statusText.textContent = 'Генерация данных...';
+    }
+
+    // Генерируем данные батчами для не блокировки UI
+    const batchSize = 1000;
+    let currentRow = 0;
+    let currentCol = 0;
+
+    const generateBatch = () => {
+      for (let i = 0; i < batchSize && currentRow < 1000; i++) {
+        // Заголовки столбцов
+        if (currentRow === 0) {
+          this.sparseMatrix!.setCell(0, currentCol, `Col${currentCol}`);
+        } else {
+          // Генерируем разные типы данных
+          let value;
+          switch (currentCol % 5) {
+            case 0:
+              value = `Строка ${currentRow}-${currentCol}`;
+              break;
+            case 1:
+              value = Math.floor(Math.random() * 10000);
+              break;
+            case 2:
+              value = (Math.random() * 100).toFixed(2);
+              break;
+            case 3:
+              value =
+                Math.random() > 0.7
+                  ? `Длинный текст в ячейке ${currentRow},${currentCol}`
+                  : `Текст ${currentRow}`;
+              break;
+            case 4:
+              value = Math.random() > 0.5 ? 'Да' : 'Нет';
+              break;
+          }
+          this.sparseMatrix!.setCell(currentRow, currentCol, value);
+        }
+
+        cellsGenerated++;
+        currentCol++;
+
+        if (currentCol >= 1000) {
+          currentCol = 0;
+          currentRow++;
+        }
+      }
+
+      // Обновляем прогресс
+      const progress = Math.round((currentRow / 1000) * 100);
+      if (statusText) {
+        statusText.textContent = `Генерация: ${progress}% (${cellsGenerated} ячеек)`;
+      }
+
+      // Продолжаем генерацию или завершаем
+      if (currentRow < 1000) {
+        setTimeout(generateBatch, 10); // Небольшая задержка для UI
+      } else {
+        const endTime = performance.now();
+        const duration = Math.round(endTime - startTime);
+
+        console.log(
+          `✅ Тестовые данные 1000x1000 сгенерированы: ${cellsGenerated} ячеек за ${duration}мс`
+        );
+
+        if (statusText) {
+          statusText.textContent = `Готов (${cellsGenerated} ячеек, ${duration}мс)`;
+        }
+
+        // Принудительно перерисовываем
+        this.needsRender = true;
+        this.render();
+      }
+    };
+
+    generateBatch();
   }
 
   /**
@@ -280,6 +431,9 @@ export class App {
         break;
       case 'paste':
         this.paste();
+        break;
+      case 'test-1000x1000':
+        this.generateTestData1000x1000();
         break;
       default:
         console.warn(`Неизвестное действие: ${action}`);
@@ -424,6 +578,13 @@ export class App {
     // Получаем видимые ячейки
     const visibleCells = this.virtualGrid.getVisibleCells();
 
+    // Заполняем ячейки данными из SparseMatrix
+    if (this.sparseMatrix) {
+      visibleCells.forEach(cell => {
+        cell.value = this.sparseMatrix!.getCell(cell.row, cell.col);
+      });
+    }
+
     // Рендерим через WebGPU или Canvas 2D
     if (this.webgpuManager) {
       await this.renderWithWebGPU(visibleCells);
@@ -476,6 +637,11 @@ export class App {
       // Рендерим заголовки столбцов и строк
       if (this.headerRenderer) {
         this.headerRenderer.render(viewport);
+      }
+
+      // Рендерим текст в ячейках
+      if (this.textRenderer) {
+        this.textRenderer.render(cells, viewport);
       }
     } catch (error) {
       console.error('❌ Ошибка WebGPU рендеринга:', error);
@@ -670,6 +836,13 @@ export class App {
           headersCanvas.height = height;
         }
 
+        // Синхронизируем размер text canvas
+        const textCanvas = document.getElementById('text-canvas') as HTMLCanvasElement;
+        if (textCanvas) {
+          textCanvas.width = width;
+          textCanvas.height = height;
+        }
+
         console.log(`📐 Canvas размер обновлен: ${width}x${height}`);
 
         // Обновляем виртуальную сетку
@@ -680,6 +853,11 @@ export class App {
         // Обновляем HeaderRenderer
         if (this.headerRenderer) {
           this.headerRenderer.updateCanvasSize(width, height);
+        }
+
+        // Обновляем TextRenderer
+        if (this.textRenderer) {
+          this.textRenderer.updateCanvasSize(width, height);
         }
 
         // Помечаем, что нужна перерисовка
