@@ -12,6 +12,8 @@ const mockWebGPUConfig = {
   device: {
     createBuffer: () => ({
       destroy: () => {},
+      getMappedRange: () => new ArrayBuffer(64),
+      unmap: () => {},
     }),
     createTexture: () => ({}),
     createShaderModule: () => ({}),
@@ -26,6 +28,7 @@ const mockWebGPUConfig = {
       beginRenderPass: () => ({
         setPipeline: () => {},
         setBindGroup: () => {},
+        setVertexBuffer: () => {},
         draw: () => {},
         end: () => {},
       }),

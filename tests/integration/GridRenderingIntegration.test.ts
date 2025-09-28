@@ -10,18 +10,25 @@ import { SparseMatrix } from '../../src/core/sparse-matrix/SparseMatrix.js';
 // Мокаем WebGPU для интеграционных тестов
 const mockWebGPUConfig = {
   device: {
-    createBuffer: () => ({}),
+    createBuffer: () => ({
+      destroy: () => {},
+      getMappedRange: () => new ArrayBuffer(64),
+      unmap: () => {},
+    }),
     createTexture: () => ({}),
     createShaderModule: () => ({}),
     createBindGroupLayout: () => ({}),
     createBindGroup: () => ({}),
     createPipelineLayout: () => ({}),
-    createRenderPipeline: () => ({}),
+    createRenderPipeline: () => ({
+      getBindGroupLayout: () => ({}),
+    }),
     createComputePipeline: () => ({}),
     createCommandEncoder: () => ({
       beginRenderPass: () => ({
         setPipeline: () => {},
         setBindGroup: () => {},
+        setVertexBuffer: () => {},
         draw: () => {},
         end: () => {},
       }),

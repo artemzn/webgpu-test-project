@@ -49,6 +49,8 @@ beforeAll(() => {
         requestDevice: async () => ({
           createBuffer: () => ({
             destroy: () => {},
+            getMappedRange: () => new ArrayBuffer(64),
+            unmap: () => {},
           }),
           createTexture: () => ({}),
           createShaderModule: () => ({}),
@@ -63,6 +65,7 @@ beforeAll(() => {
             beginRenderPass: () => ({
               setPipeline: () => {},
               setBindGroup: () => {},
+              setVertexBuffer: () => {},
               draw: () => {},
               end: () => {},
             }),
@@ -125,6 +128,27 @@ beforeAll(() => {
     }
     return originalGetElementById.call(this, id);
   };
+
+  // Мокаем ResizeObserver для адаптивности
+  if (!(globalThis as any).ResizeObserver) {
+    (globalThis as any).ResizeObserver = class ResizeObserver {
+      constructor(callback: ResizeObserverCallback) {
+        // Сохраняем callback для потенциального использования
+      }
+
+      observe(target: Element): void {
+        // Заглушка для observe
+      }
+
+      unobserve(target: Element): void {
+        // Заглушка для unobserve
+      }
+
+      disconnect(): void {
+        // Заглушка для disconnect
+      }
+    };
+  }
 });
 
 afterAll(() => {
