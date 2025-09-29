@@ -32,9 +32,9 @@ export class SparseMatrix {
 
     const block = this.blocks.get(blockKey)!;
     const hadValue = block.has(cellKey);
-    
+
     block.set(cellKey, value);
-    
+
     // Увеличиваем счетчик только для новых ячеек
     if (!hadValue) {
       this.totalCells++;
@@ -89,8 +89,13 @@ export class SparseMatrix {
   /**
    * Получение всех ячеек в диапазоне
    */
-  getCellsInRange(startRow: number, startCol: number, endRow: number, endCol: number): Array<{row: number, col: number, value: any}> {
-    const cells: Array<{row: number, col: number, value: any}> = [];
+  getCellsInRange(
+    startRow: number,
+    startCol: number,
+    endRow: number,
+    endCol: number
+  ): Array<{ row: number; col: number; value: any }> {
+    const cells: Array<{ row: number; col: number; value: any }> = [];
 
     for (let row = startRow; row <= endRow; row++) {
       for (let col = startCol; col <= endCol; col++) {
@@ -107,8 +112,8 @@ export class SparseMatrix {
   /**
    * Получение всех заполненных ячеек
    */
-  getAllCells(): Array<{row: number, col: number, value: any}> {
-    const cells: Array<{row: number, col: number, value: any}> = [];
+  getAllCells(): Array<{ row: number; col: number; value: any }> {
+    const cells: Array<{ row: number; col: number; value: any }> = [];
 
     for (const [, block] of this.blocks) {
       for (const [cellKey, value] of block) {
@@ -161,7 +166,7 @@ export class SparseMatrix {
   } {
     const memoryUsage = this.getMemoryUsage();
     const totalBlocks = this.blocks.size;
-    
+
     // Примерная оценка заполненности (если бы все ячейки были заполнены)
     const maxPossibleCells = 1000000 * 1000000; // 1M x 1M
     const fillRatio = this.totalCells / maxPossibleCells;
@@ -171,7 +176,7 @@ export class SparseMatrix {
       totalBlocks,
       memoryUsage,
       blockSize: this.blockSize,
-      fillRatio
+      fillRatio,
     };
   }
 
@@ -180,23 +185,23 @@ export class SparseMatrix {
    */
   optimize(): void {
     console.log('🔧 Оптимизация разреженной матрицы...');
-    
+
     const statsBefore = this.getStats();
-    
+
     // Удаляем пустые блоки
     for (const [blockKey, block] of this.blocks) {
       if (block.size === 0) {
         this.blocks.delete(blockKey);
       }
     }
-    
+
     const statsAfter = this.getStats();
-    
+
     console.log('✅ Оптимизация завершена:', {
       blocksBefore: statsBefore.totalBlocks,
       blocksAfter: statsAfter.totalBlocks,
       memoryBefore: `${(statsBefore.memoryUsage / 1024).toFixed(2)} KB`,
-      memoryAfter: `${(statsAfter.memoryUsage / 1024).toFixed(2)} KB`
+      memoryAfter: `${(statsAfter.memoryUsage / 1024).toFixed(2)} KB`,
     });
   }
 
@@ -221,7 +226,7 @@ export class SparseMatrix {
   /**
    * Парсинг ключа ячейки
    */
-  private parseCellKey(cellKey: string): { row: number, col: number } {
+  private parseCellKey(cellKey: string): { row: number; col: number } {
     const parts = cellKey.split('_');
     const localRow = Number(parts[0]) || 0;
     const localCol = Number(parts[1]) || 0;
@@ -238,9 +243,9 @@ export class SparseMatrix {
       blocks: Object.fromEntries(
         Array.from(this.blocks.entries()).map(([blockKey, block]) => [
           blockKey,
-          Object.fromEntries(block)
+          Object.fromEntries(block),
         ])
-      )
+      ),
     };
 
     return JSON.stringify(data, null, 2);
@@ -252,24 +257,224 @@ export class SparseMatrix {
   importFromJSON(json: string): void {
     try {
       const data = JSON.parse(json);
-      
+
       this.blockSize = data.blockSize || 1000;
       this.totalCells = data.totalCells || 0;
-      
+
       this.blocks.clear();
-      
+
       for (const [blockKey, blockData] of Object.entries(data.blocks)) {
         if (blockData && typeof blockData === 'object') {
           const block = new Map(Object.entries(blockData));
           this.blocks.set(blockKey, block);
         }
       }
-      
+
       console.log('✅ Данные импортированы из JSON');
-      
     } catch (error) {
       console.error('❌ Ошибка импорта JSON:', error);
       throw new Error('Неверный формат JSON');
     }
+  }
+
+  /**
+   * Вставка строки на указанную позицию
+   */
+  insertRow(atRow: number): void {
+    console.log(`🔧 Вставка строки на позиции ${atRow}`);
+
+    // Создаем новую карту для обновленных данных
+    const newBlocks = new Map<string, Map<string, any>>();
+
+    // Перебираем все блоки
+    for (const [blockKey, block] of this.blocks) {
+      const newBlock = new Map<string, any>();
+
+      // Получаем глобальные координаты блока
+      const [blockRowStr, blockColStr] = blockKey.split('_');
+      const blockRow = parseInt(blockRowStr, 10) * this.blockSize;
+      const blockCol = parseInt(blockColStr, 10) * this.blockSize;
+
+      // Перебираем все ячейки в блоке
+      for (const [cellKey, value] of block) {
+        const { row: localRow, col: localCol } = this.parseCellKey(cellKey);
+
+        // Восстанавливаем глобальные координаты
+        const globalRow = blockRow + localRow;
+        const globalCol = blockCol + localCol;
+
+        if (globalRow >= atRow) {
+          // Сдвигаем строки вниз
+          const newGlobalRow = globalRow + 1;
+          const newCellKey = this.getCellKey(newGlobalRow, globalCol);
+          newBlock.set(newCellKey, value);
+        } else {
+          // Оставляем как есть
+          newBlock.set(cellKey, value);
+        }
+      }
+
+      if (newBlock.size > 0) {
+        newBlocks.set(blockKey, newBlock);
+      }
+    }
+
+    this.blocks = newBlocks;
+    console.log(`✅ Строка вставлена на позиции ${atRow}`);
+  }
+
+  /**
+   * Удаление строки
+   */
+  deleteRow(atRow: number): void {
+    console.log(`🗑️ Удаление строки ${atRow}`);
+
+    // Создаем новую карту для обновленных данных
+    const newBlocks = new Map<string, Map<string, any>>();
+
+    // Перебираем все блоки
+    for (const [blockKey, block] of this.blocks) {
+      const newBlock = new Map<string, any>();
+
+      // Получаем глобальные координаты блока
+      const [blockRowStr, blockColStr] = blockKey.split('_');
+      const blockRow = parseInt(blockRowStr, 10) * this.blockSize;
+      const blockCol = parseInt(blockColStr, 10) * this.blockSize;
+
+      // Перебираем все ячейки в блоке
+      for (const [cellKey, value] of block) {
+        const { row: localRow, col: localCol } = this.parseCellKey(cellKey);
+
+        // Восстанавливаем глобальные координаты
+        const globalRow = blockRow + localRow;
+        const globalCol = blockCol + localCol;
+
+        if (globalRow === atRow) {
+          // Удаляем ячейки из удаляемой строки
+          continue;
+        } else if (globalRow > atRow) {
+          // Сдвигаем строки вверх
+          const newGlobalRow = globalRow - 1;
+          const newCellKey = this.getCellKey(newGlobalRow, globalCol);
+          newBlock.set(newCellKey, value);
+        } else {
+          // Оставляем как есть
+          newBlock.set(cellKey, value);
+        }
+      }
+
+      if (newBlock.size > 0) {
+        newBlocks.set(blockKey, newBlock);
+      }
+    }
+
+    this.blocks = newBlocks;
+    console.log(`✅ Строка ${atRow} удалена`);
+  }
+
+  /**
+   * Вставка столбца на указанную позицию
+   */
+  insertColumn(atCol: number): void {
+    console.log(`🔧 Вставка столбца на позиции ${atCol}`);
+
+    // Создаем новую карту для обновленных данных
+    const newBlocks = new Map<string, Map<string, any>>();
+
+    // Перебираем все блоки
+    for (const [blockKey, block] of this.blocks) {
+      const newBlock = new Map<string, any>();
+
+      // Получаем глобальные координаты блока
+      const [blockRowStr, blockColStr] = blockKey.split('_');
+      const blockRow = parseInt(blockRowStr, 10) * this.blockSize;
+      const blockCol = parseInt(blockColStr, 10) * this.blockSize;
+
+      // Перебираем все ячейки в блоке
+      for (const [cellKey, value] of block) {
+        const { row: localRow, col: localCol } = this.parseCellKey(cellKey);
+
+        // Восстанавливаем глобальные координаты
+        const globalRow = blockRow + localRow;
+        const globalCol = blockCol + localCol;
+
+        if (globalCol >= atCol) {
+          // Сдвигаем столбцы вправо
+          const newGlobalCol = globalCol + 1;
+          const newCellKey = this.getCellKey(globalRow, newGlobalCol);
+          newBlock.set(newCellKey, value);
+        } else {
+          // Оставляем как есть
+          newBlock.set(cellKey, value);
+        }
+      }
+
+      if (newBlock.size > 0) {
+        newBlocks.set(blockKey, newBlock);
+      }
+    }
+
+    this.blocks = newBlocks;
+    console.log(`✅ Столбец вставлен на позиции ${atCol}`);
+  }
+
+  /**
+   * Удаление столбца
+   */
+  deleteColumn(atCol: number): void {
+    console.log(`🗑️ Удаление столбца ${atCol}`);
+
+    // Создаем новую карту для обновленных данных
+    const newBlocks = new Map<string, Map<string, any>>();
+
+    // Перебираем все блоки
+    for (const [blockKey, block] of this.blocks) {
+      const newBlock = new Map<string, any>();
+
+      // Получаем глобальные координаты блока
+      const [blockRowStr, blockColStr] = blockKey.split('_');
+      const blockRow = parseInt(blockRowStr, 10) * this.blockSize;
+      const blockCol = parseInt(blockColStr, 10) * this.blockSize;
+
+      // Перебираем все ячейки в блоке
+      for (const [cellKey, value] of block) {
+        const { row: localRow, col: localCol } = this.parseCellKey(cellKey);
+
+        // Восстанавливаем глобальные координаты
+        const globalRow = blockRow + localRow;
+        const globalCol = blockCol + localCol;
+
+        if (globalCol === atCol) {
+          // Удаляем ячейки из удаляемого столбца
+          continue;
+        } else if (globalCol > atCol) {
+          // Сдвигаем столбцы влево
+          const newGlobalCol = globalCol - 1;
+          const newCellKey = this.getCellKey(globalRow, newGlobalCol);
+          newBlock.set(newCellKey, value);
+        } else {
+          // Оставляем как есть
+          newBlock.set(cellKey, value);
+        }
+      }
+
+      if (newBlock.size > 0) {
+        newBlocks.set(blockKey, newBlock);
+      }
+    }
+
+    this.blocks = newBlocks;
+    console.log(`✅ Столбец ${atCol} удален`);
+  }
+
+  /**
+   * Парсинг ключа ячейки для получения row и col
+   */
+  private parseCellKey(cellKey: string): { row: number; col: number } {
+    const [rowStr, colStr] = cellKey.split('_');
+    return {
+      row: parseInt(rowStr, 10),
+      col: parseInt(colStr, 10),
+    };
   }
 }

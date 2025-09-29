@@ -1114,32 +1114,105 @@ export class App {
    * Вставка строки
    */
   private insertRow(): void {
-    console.log('➕ Вставка строки (заглушка)');
-    // TODO: Реализовать в следующем спринте
+    if (!this.sparseMatrix || !this.virtualGrid) return;
+
+    // Получаем активную ячейку для определения позиции вставки
+    const activeCell = this.virtualGrid.getActiveCell();
+    const insertAtRow = activeCell ? activeCell.row : 0;
+
+    console.log(`➕ Вставка строки на позиции ${insertAtRow}`);
+
+    // Вставляем строку в SparseMatrix
+    this.sparseMatrix.insertRow(insertAtRow);
+
+    // Принудительно перерисовываем
+    this.needsRender = true;
+    this.render();
   }
 
   /**
    * Вставка столбца
    */
   private insertColumn(): void {
-    console.log('➕ Вставка столбца (заглушка)');
-    // TODO: Реализовать в следующем спринте
+    if (!this.sparseMatrix || !this.virtualGrid) return;
+
+    // Получаем активную ячейку для определения позиции вставки
+    const activeCell = this.virtualGrid.getActiveCell();
+    const insertAtCol = activeCell ? activeCell.col : 0;
+
+    console.log(`➕ Вставка столбца на позиции ${insertAtCol}`);
+
+    // Вставляем столбец в SparseMatrix
+    this.sparseMatrix.insertColumn(insertAtCol);
+
+    // Принудительно перерисовываем
+    this.needsRender = true;
+    this.render();
   }
 
   /**
    * Удаление строки
    */
   private deleteRow(): void {
-    console.log('🗑️ Удаление строки (заглушка)');
-    // TODO: Реализовать в следующем спринте
+    if (!this.sparseMatrix || !this.virtualGrid) return;
+
+    // Получаем активную ячейку для определения позиции удаления
+    const activeCell = this.virtualGrid.getActiveCell();
+    if (!activeCell) {
+      console.warn('⚠️ Нет активной ячейки для удаления строки');
+      return;
+    }
+
+    const deleteAtRow = activeCell.row;
+
+    // Подтверждение удаления
+    const confirmed = confirm(
+      `Удалить строку ${deleteAtRow + 1}? Все данные в этой строке будут потеряны.`
+    );
+    if (!confirmed) return;
+
+    console.log(`🗑️ Удаление строки ${deleteAtRow}`);
+
+    // Удаляем строку из SparseMatrix
+    this.sparseMatrix.deleteRow(deleteAtRow);
+
+    // Принудительно перерисовываем
+    this.needsRender = true;
+    this.render();
   }
 
   /**
    * Удаление столбца
    */
   private deleteColumn(): void {
-    console.log('🗑️ Удаление столбца (заглушка)');
-    // TODO: Реализовать в следующем спринте
+    if (!this.sparseMatrix || !this.virtualGrid) return;
+
+    // Получаем активную ячейку для определения позиции удаления
+    const activeCell = this.virtualGrid.getActiveCell();
+    if (!activeCell) {
+      console.warn('⚠️ Нет активной ячейки для удаления столбца');
+      return;
+    }
+
+    const deleteAtCol = activeCell.col;
+
+    // Преобразуем индекс столбца в букву для пользователя
+    const columnLetter = this.indexToColumnLetter(deleteAtCol);
+
+    // Подтверждение удаления
+    const confirmed = confirm(
+      `Удалить столбец ${columnLetter}? Все данные в этом столбце будут потеряны.`
+    );
+    if (!confirmed) return;
+
+    console.log(`🗑️ Удаление столбца ${deleteAtCol} (${columnLetter})`);
+
+    // Удаляем столбец из SparseMatrix
+    this.sparseMatrix.deleteColumn(deleteAtCol);
+
+    // Принудительно перерисовываем
+    this.needsRender = true;
+    this.render();
   }
 
   /**
@@ -1313,5 +1386,17 @@ export class App {
     } catch (error) {
       console.error('❌ Ошибка рендеринга выделения:', error);
     }
+  }
+
+  /**
+   * Преобразование индекса столбца в букву (0 -> A, 1 -> B, ..., 25 -> Z, 26 -> AA)
+   */
+  private indexToColumnLetter(index: number): string {
+    let result = '';
+    while (index >= 0) {
+      result = String.fromCharCode(65 + (index % 26)) + result;
+      index = Math.floor(index / 26) - 1;
+    }
+    return result;
   }
 }
