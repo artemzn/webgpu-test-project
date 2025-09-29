@@ -23,6 +23,9 @@ export class App {
   private sparseMatrix: SparseMatrix | null = null;
   private isInitialized = false;
 
+  // Координаты для контекстного меню
+  private contextMenuCell: { row: number; col: number } | null = null;
+
   // FPS tracking
   private frameCount = 0;
   private fps = 0;
@@ -1060,11 +1063,39 @@ export class App {
    */
   private showContextMenu(event: MouseEvent): void {
     const contextMenu = document.getElementById('context-menu');
-    if (contextMenu) {
-      contextMenu.style.display = 'block';
-      contextMenu.style.left = `${event.clientX}px`;
-      contextMenu.style.top = `${event.clientY}px`;
+    if (!contextMenu || !this.virtualGrid) return;
+
+    // Вычисляем координаты ячейки по клику
+    const canvasRect = this.canvas.getBoundingClientRect();
+    const clickX = event.clientX - canvasRect.left;
+    const clickY = event.clientY - canvasRect.top;
+
+    // Учитываем отступы для заголовков
+    const headerWidth = 30;
+    const headerHeight = 25;
+
+    // Проверяем, что клик не по заголовкам
+    if (clickX < headerWidth || clickY < headerHeight) {
+      return; // Не показываем меню для заголовков
     }
+
+    // Вычисляем координаты ячейки
+    const cellX = clickX - headerWidth;
+    const cellY = clickY - headerHeight;
+
+    const viewport = this.virtualGrid.getViewport();
+    const col = viewport.startCol + Math.floor(cellX / this.config.cellWidth);
+    const row = viewport.startRow + Math.floor(cellY / this.config.cellHeight);
+
+    // Сохраняем координаты ячейки для операций
+    this.contextMenuCell = { row, col };
+
+    console.log(`🎯 Контекстное меню для ячейки ${row},${col} (клик: ${clickX},${clickY})`);
+
+    // Показываем меню
+    contextMenu.style.display = 'block';
+    contextMenu.style.left = `${event.clientX}px`;
+    contextMenu.style.top = `${event.clientY}px`;
   }
 
   /**
@@ -1075,6 +1106,8 @@ export class App {
     if (contextMenu) {
       contextMenu.style.display = 'none';
     }
+    // Очищаем сохраненные координаты
+    this.contextMenuCell = null;
   }
 
   /**
@@ -1114,11 +1147,10 @@ export class App {
    * Вставка строки
    */
   private insertRow(): void {
-    if (!this.sparseMatrix || !this.virtualGrid) return;
+    if (!this.sparseMatrix) return;
 
-    // Получаем активную ячейку для определения позиции вставки
-    const activeCell = this.virtualGrid.getActiveCell();
-    const insertAtRow = activeCell ? activeCell.row : 0;
+    // Используем координаты из контекстного меню
+    const insertAtRow = this.contextMenuCell ? this.contextMenuCell.row : 0;
 
     console.log(`➕ Вставка строки на позиции ${insertAtRow}`);
 
@@ -1134,11 +1166,10 @@ export class App {
    * Вставка столбца
    */
   private insertColumn(): void {
-    if (!this.sparseMatrix || !this.virtualGrid) return;
+    if (!this.sparseMatrix) return;
 
-    // Получаем активную ячейку для определения позиции вставки
-    const activeCell = this.virtualGrid.getActiveCell();
-    const insertAtCol = activeCell ? activeCell.col : 0;
+    // Используем координаты из контекстного меню
+    const insertAtCol = this.contextMenuCell ? this.contextMenuCell.col : 0;
 
     console.log(`➕ Вставка столбца на позиции ${insertAtCol}`);
 
@@ -1154,16 +1185,15 @@ export class App {
    * Удаление строки
    */
   private deleteRow(): void {
-    if (!this.sparseMatrix || !this.virtualGrid) return;
+    if (!this.sparseMatrix) return;
 
-    // Получаем активную ячейку для определения позиции удаления
-    const activeCell = this.virtualGrid.getActiveCell();
-    if (!activeCell) {
-      console.warn('⚠️ Нет активной ячейки для удаления строки');
+    // Используем координаты из контекстного меню
+    if (!this.contextMenuCell) {
+      console.warn('⚠️ Нет координат для удаления строки');
       return;
     }
 
-    const deleteAtRow = activeCell.row;
+    const deleteAtRow = this.contextMenuCell.row;
 
     // Подтверждение удаления
     const confirmed = confirm(
@@ -1185,16 +1215,15 @@ export class App {
    * Удаление столбца
    */
   private deleteColumn(): void {
-    if (!this.sparseMatrix || !this.virtualGrid) return;
+    if (!this.sparseMatrix) return;
 
-    // Получаем активную ячейку для определения позиции удаления
-    const activeCell = this.virtualGrid.getActiveCell();
-    if (!activeCell) {
-      console.warn('⚠️ Нет активной ячейки для удаления столбца');
+    // Используем координаты из контекстного меню
+    if (!this.contextMenuCell) {
+      console.warn('⚠️ Нет координат для удаления столбца');
       return;
     }
 
-    const deleteAtCol = activeCell.col;
+    const deleteAtCol = this.contextMenuCell.col;
 
     // Преобразуем индекс столбца в букву для пользователя
     const columnLetter = this.indexToColumnLetter(deleteAtCol);
