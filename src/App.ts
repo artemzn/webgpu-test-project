@@ -765,17 +765,6 @@ export class App {
   }
 
   /**
-   * Обновление информации о ячейке
-   */
-  private updateCellInfo(cell: any): void {
-    const cellInfo = document.getElementById('cell-info');
-    if (cellInfo) {
-      const colName = this.getColumnName(cell.col);
-      cellInfo.textContent = `${colName}${cell.row + 1}`;
-    }
-  }
-
-  /**
    * Обновление статус-бара
    */
   private updateStatusBar(): void {
@@ -1584,33 +1573,6 @@ export class App {
         this.needsRender = true;
         console.log(`📊 Прокрутка к ячейке ${row},${col}`);
       }
-    }
-  }
-
-  /**
-   * Рендеринг выделения ячейки
-   */
-  private async renderCellSelection(cell: { row: number; col: number }): Promise<void> {
-    if (!this.gridRenderer) return;
-
-    try {
-      // Создаем объект ячейки для рендеринга с абсолютными координатами
-      const viewport = this.virtualGrid!.getViewport();
-      const selectedCell = {
-        row: cell.row,
-        col: cell.col,
-        value: null,
-        // Абсолютные экранные координаты БЕЗ вычитания viewport offset
-        screenX: (cell.col - viewport.startCol) * this.config.cellWidth,
-        screenY: (cell.row - viewport.startRow) * this.config.cellHeight,
-        width: this.config.cellWidth,
-        height: this.config.cellHeight,
-      };
-
-      await this.gridRenderer.renderSelection(selectedCell);
-      console.log(`🎯 Выделена ячейка ${cell.row},${cell.col}`);
-    } catch (error) {
-      console.error('❌ Ошибка рендеринга выделения:', error);
     }
   }
 

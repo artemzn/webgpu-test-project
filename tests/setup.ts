@@ -111,9 +111,9 @@ beforeAll(() => {
         getCurrentTexture: () => ({
           createView: () => ({}),
         }),
-      };
+      } as any;
     }
-    return originalGetContext.call(this, contextType);
+    return originalGetContext.call(this, contextType as any);
   };
 
   // Мокаем document.getElementById для canvas
@@ -132,15 +132,15 @@ beforeAll(() => {
   // Мокаем ResizeObserver для адаптивности
   if (!(globalThis as any).ResizeObserver) {
     (globalThis as any).ResizeObserver = class ResizeObserver {
-      constructor(callback: ResizeObserverCallback) {
+      constructor(_callback: ResizeObserverCallback) {
         // Сохраняем callback для потенциального использования
       }
 
-      observe(target: Element): void {
+      observe(_target: Element): void {
         // Заглушка для observe
       }
 
-      unobserve(target: Element): void {
+      unobserve(_target: Element): void {
         // Заглушка для unobserve
       }
 

@@ -5,7 +5,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { GridRenderer } from '../../src/rendering/GridRenderer.js';
 import { VirtualGrid } from '../../src/core/virtual-grid/VirtualGrid.js';
-import { SparseMatrix } from '../../src/core/sparse-matrix/SparseMatrix.js';
 
 // Мокаем WebGPU для тестов
 const mockWebGPUConfig = {

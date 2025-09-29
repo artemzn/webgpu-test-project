@@ -56,7 +56,6 @@ global.URL = global.URL || {};
 describe('Interaction (Взаимодействие)', () => {
   let app: App;
   let canvas: HTMLCanvasElement;
-  let container: HTMLDivElement;
 
   beforeEach(async () => {
     // Создаем DOM структуру
@@ -88,10 +87,11 @@ describe('Interaction (Взаимодействие)', () => {
     `;
 
     canvas = document.getElementById('spreadsheet-canvas') as HTMLCanvasElement;
-    container = document.querySelector('.spreadsheet-container') as HTMLDivElement;
 
     const config = {
       canvasId: 'spreadsheet-canvas',
+      enableWebGPU: true,
+      enableCollaborative: false,
       cellWidth: 80,
       cellHeight: 25,
       maxRows: 1000000,

@@ -19,10 +19,8 @@ export class FormulaManager {
   private engine: FormulaEngine;
   private formulas: Map<string, FormulaInfo> = new Map(); // "row:col" -> FormulaInfo
   private updateFormulaCallback?: (row: number, col: number, formula: string) => void;
-  private context: FormulaContext;
 
   constructor(context: FormulaContext) {
-    this.context = context;
     this.parser = new FormulaParser();
     this.engine = new FormulaEngine(context);
     console.log('📊 FormulaManager инициализирован');
@@ -400,11 +398,11 @@ export class FormulaManager {
   private recalculateAllFormulas(): void {
     console.log(`🔄 Пересчитываем все ${this.formulas.size} формул`);
 
-    for (const [cellKey, formulaInfo] of this.formulas) {
+    for (const [cellKey] of this.formulas) {
       try {
         const [rowStr, colStr] = cellKey.split(':');
-        const row = parseInt(rowStr, 10);
-        const col = parseInt(colStr, 10);
+        const row = parseInt(rowStr || '0', 10);
+        const col = parseInt(colStr || '0', 10);
         const result = this.evaluateFormula(row, col);
         console.log(`🔄 Формула ${cellKey} пересчитана: ${JSON.stringify(result)}`);
       } catch (error) {

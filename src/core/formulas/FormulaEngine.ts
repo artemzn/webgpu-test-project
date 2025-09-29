@@ -7,8 +7,6 @@ import {
   FormulaNode,
   CellReference,
   CellRange,
-  NumberLiteral,
-  StringLiteral,
   FunctionCall,
   BinaryOperation,
   UnaryOperation,

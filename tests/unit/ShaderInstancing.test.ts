@@ -2,7 +2,7 @@
  * Тесты для шейдеров с поддержкой instancing
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { RenderPipelineBuilder } from '../../src/rendering/webgpu-setup/RenderPipelineBuilder.js';
 
 // Мокаем WebGPU device для тестов
@@ -120,7 +120,7 @@ describe('Shader Instancing Tests', () => {
 
       const pipeline = pipelineBuilder.createGridPipeline();
       const buffer = pipelineBuilder.createGridUniformBuffer();
-      const bindGroup = pipelineBuilder.createGridBindGroup(pipeline, buffer);
+      pipelineBuilder.createGridBindGroup(pipeline, buffer);
 
       const endTime = performance.now();
       const creationTime = endTime - startTime;

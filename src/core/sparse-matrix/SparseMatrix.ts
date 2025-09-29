@@ -301,8 +301,8 @@ export class SparseMatrix {
 
       // Получаем глобальные координаты блока
       const [blockRowStr, blockColStr] = blockKey.split('_');
-      const blockRow = parseInt(blockRowStr, 10) * this.blockSize;
-      const blockCol = parseInt(blockColStr, 10) * this.blockSize;
+      const blockRow = parseInt(blockRowStr || '0', 10) * this.blockSize;
+      const blockCol = parseInt(blockColStr || '0', 10) * this.blockSize;
 
       // Перебираем все ячейки в блоке
       for (const [cellKey, value] of block) {
@@ -356,8 +356,8 @@ export class SparseMatrix {
 
       // Получаем глобальные координаты блока
       const [blockRowStr, blockColStr] = blockKey.split('_');
-      const blockRow = parseInt(blockRowStr, 10) * this.blockSize;
-      const blockCol = parseInt(blockColStr, 10) * this.blockSize;
+      const blockRow = parseInt(blockRowStr || '0', 10) * this.blockSize;
+      const blockCol = parseInt(blockColStr || '0', 10) * this.blockSize;
 
       // Перебираем все ячейки в блоке
       for (const [cellKey, value] of block) {
@@ -405,8 +405,8 @@ export class SparseMatrix {
 
       // Получаем глобальные координаты блока
       const [blockRowStr, blockColStr] = blockKey.split('_');
-      const blockRow = parseInt(blockRowStr, 10) * this.blockSize;
-      const blockCol = parseInt(blockColStr, 10) * this.blockSize;
+      const blockRow = parseInt(blockRowStr || '0', 10) * this.blockSize;
+      const blockCol = parseInt(blockColStr || '0', 10) * this.blockSize;
 
       // Перебираем все ячейки в блоке
       for (const [cellKey, value] of block) {
@@ -451,8 +451,8 @@ export class SparseMatrix {
 
       // Получаем глобальные координаты блока
       const [blockRowStr, blockColStr] = blockKey.split('_');
-      const blockRow = parseInt(blockRowStr, 10) * this.blockSize;
-      const blockCol = parseInt(blockColStr, 10) * this.blockSize;
+      const blockRow = parseInt(blockRowStr || '0', 10) * this.blockSize;
+      const blockCol = parseInt(blockColStr || '0', 10) * this.blockSize;
 
       // Перебираем все ячейки в блоке
       for (const [cellKey, value] of block) {
@@ -483,16 +483,5 @@ export class SparseMatrix {
 
     this.blocks = newBlocks;
     console.log(`✅ Столбец ${atCol} удален`);
-  }
-
-  /**
-   * Парсинг ключа ячейки для получения row и col
-   */
-  private parseCellKey(cellKey: string): { row: number; col: number } {
-    const [rowStr, colStr] = cellKey.split('_');
-    return {
-      row: parseInt(rowStr, 10),
-      col: parseInt(colStr, 10),
-    };
   }
 }

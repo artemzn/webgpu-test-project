@@ -13,7 +13,6 @@ export class RenderManager {
   private gridPipeline: GPURenderPipeline | null = null;
   private borderPipeline: GPURenderPipeline | null = null;
   private selectionPipeline: GPURenderPipeline | null = null;
-  private headerPipeline: GPURenderPipeline | null = null;
   private textPipeline: GPURenderPipeline | null = null;
 
   private gridUniformBuffer: GPUBuffer | null = null;
@@ -27,7 +26,6 @@ export class RenderManager {
 
   // Буферы для заголовков
   private headerUniformBuffer: GPUBuffer | null = null;
-  private headerBindGroup: GPUBindGroup | null = null;
 
   private canvas: HTMLCanvasElement;
   private cellWidth: number;
@@ -61,7 +59,6 @@ export class RenderManager {
       this.gridPipeline = this.pipelineBuilder.createGridPipeline();
       this.borderPipeline = this.pipelineBuilder.createBorderPipeline();
       this.selectionPipeline = this.pipelineBuilder.createSelectionPipeline();
-      this.headerPipeline = this.pipelineBuilder.createHeaderPipeline();
       this.textPipeline = this.pipelineBuilder.createTextPipeline();
 
       // Создаем uniform буферы и bind groups
@@ -84,10 +81,6 @@ export class RenderManager {
 
       // Создаем буферы для заголовков
       this.headerUniformBuffer = this.pipelineBuilder.createHeaderUniformBuffer();
-      this.headerBindGroup = this.pipelineBuilder.createHeaderBindGroup(
-        this.headerPipeline,
-        this.headerUniformBuffer
-      );
 
       // Создаем буфер вершин для квада (0,0) до (1,1)
       const vertices = new Float32Array([
@@ -162,8 +155,10 @@ export class RenderManager {
       this.renderVisibleCells(renderPass, visibleCells);
 
       // 2. Рендерим границы ячеек поверх фона
-      renderPass.setPipeline(this.borderPipeline);
-      renderPass.setBindGroup(0, this.borderBindGroup);
+      if (this.borderPipeline) {
+        renderPass.setPipeline(this.borderPipeline);
+        renderPass.setBindGroup(0, this.borderBindGroup);
+      }
       if (this.gridVertexBuffer) {
         renderPass.setVertexBuffer(0, this.gridVertexBuffer);
       }
@@ -274,69 +269,6 @@ export class RenderManager {
   }
 
   /**
-   * Рендеринг заголовков столбцов (A, B, C...) и номеров строк (1, 2, 3...)
-   */
-  private renderHeaders(renderPass: GPURenderPassEncoder, viewport: any): void {
-    if (!this.headerPipeline || !this.headerBindGroup || !this.headerUniformBuffer) {
-      console.log(`❌ ЗАГОЛОВКИ: отсутствуют pipeline/bindGroup/uniformBuffer`);
-      return;
-    }
-
-    const startCol = viewport.startCol || 0;
-    const endCol = viewport.endCol || 24;
-    const startRow = viewport.startRow || 0;
-    const endRow = viewport.endRow || 32;
-
-    console.log(`🔍 ОТЛАДКА ЗАГОЛОВКОВ:`, {
-      startCol,
-      endCol,
-      startRow,
-      endRow,
-      cellWidth: this.cellWidth,
-      cellHeight: this.cellHeight,
-      canvasSize: [this.canvas.width, this.canvas.height],
-    });
-
-    // РЕНДЕРИМ ТОЛЬКО ОДИН ТЕСТОВЫЙ ЗАГОЛОВОК!
-    const x = 30; // ЛЕВЫЙ ВЕРХНИЙ УГОЛ
-    const y = 30; // ЛЕВЫЙ ВЕРХНИЙ УГОЛ
-
-    console.log(`🔍 ТЕСТОВЫЙ ЗАГОЛОВОК:`, {
-      position: [x, y],
-      size: [80, 50],
-      'NDC координаты': {
-        x: (x / this.canvas.width) * 2.0 - 1.0,
-        y: 1.0 - (y / this.canvas.height) * 2.0,
-      },
-    });
-
-    // ОБНОВЛЯЕМ UNIFORM
-    this.pipelineBuilder.updateHeaderUniforms(
-      this.headerUniformBuffer,
-      [x, y], // cellPosition
-      [80, 50], // cellSize БОЛЬШОЙ ДЛЯ ВИДИМОСТИ!
-      [this.canvas.width, this.canvas.height] // viewportSize
-    );
-
-    // УСТАНАВЛИВАЕМ PIPELINE И BINDGROUP
-    renderPass.setPipeline(this.headerPipeline);
-    renderPass.setBindGroup(0, this.headerBindGroup);
-    console.log(`🎯 РЕНДЕРИМ ТЕСТОВЫЙ ЗАГОЛОВОК в позиции [${x}, ${y}]`);
-    renderPass.draw(6, 1, 0, 0); // Рендерим один заголовок
-
-    // СТРОКИ ПОКА ОТКЛЮЧЕНЫ - ТЕСТИРУЕМ ТОЛЬКО ОДИН ЗАГОЛОВОК
-    /*
-    for (let row = startRow; row < endRow; row++) {
-      // ... код строк ...
-    }
-    */
-
-    console.log(
-      `📝 Отрендерили заголовки: ${endCol - startCol} столбцов, ${endRow - startRow} строк`
-    );
-  }
-
-  /**
    * Рендеринг выделения ячейки (для совместимости с тестами)
    * @deprecated Используйте render() с параметром selectedCell
    */
@@ -374,7 +306,6 @@ export class RenderManager {
 
     this.gridPipeline = null;
     this.selectionPipeline = null;
-    this.headerPipeline = null;
     this.textPipeline = null;
     this.gridBindGroup = null;
 

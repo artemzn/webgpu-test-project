@@ -5,8 +5,8 @@ import { resolve } from 'path';
 export default defineConfig({
   plugins: [
     legacy({
-      targets: ['defaults', 'not IE 11']
-    })
+      targets: ['defaults', 'not IE 11'],
+    }),
   ],
   resolve: {
     alias: {
@@ -16,13 +16,13 @@ export default defineConfig({
       '@/ui': resolve(__dirname, 'src/ui'),
       '@/data': resolve(__dirname, 'src/data'),
       '@/utils': resolve(__dirname, 'src/utils'),
-      '@/types': resolve(__dirname, 'src/types')
-    }
+      '@/types': resolve(__dirname, 'src/types'),
+    },
   },
   server: {
     port: 3000,
     open: true,
-    host: true
+    host: true,
   },
   build: {
     target: 'es2022',
@@ -31,14 +31,25 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
-          'webgpu': ['@/rendering/webgpu-setup'],
-          'core': ['@/core/virtual-grid', '@/core/sparse-matrix'],
-          'ui': ['@/ui/components', '@/ui/interactions']
-        }
-      }
-    }
+          webgpu: [
+            '@/rendering/webgpu-setup/DeviceManager',
+            '@/rendering/webgpu-setup/RenderManager',
+            '@/rendering/webgpu-setup/RenderPipelineBuilder',
+          ],
+          core: [
+            '@/core/virtual-grid/VirtualGrid',
+            '@/core/sparse-matrix/SparseMatrix',
+            '@/core/formulas/FormulaManager',
+            '@/core/formulas/FormulaEngine',
+            '@/core/formulas/FormulaParser',
+            '@/core/formulas/FormulaAST',
+          ],
+          rendering: ['@/rendering/HeaderRenderer', '@/rendering/TextRenderer'],
+        },
+      },
+    },
   },
   optimizeDeps: {
-    include: ['uuid']
-  }
+    include: ['uuid'],
+  },
 });

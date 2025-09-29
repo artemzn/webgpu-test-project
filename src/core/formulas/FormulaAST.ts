@@ -102,8 +102,8 @@ export class FormulaUtils {
     }
 
     const [, dollarCol, colLetter, dollarRow, rowStr] = match;
-    const col = this.columnLetterToIndex(colLetter);
-    const row = parseInt(rowStr, 10) - 1; // Excel использует 1-based индексацию
+    const col = this.columnLetterToIndex(colLetter || 'A');
+    const row = parseInt(rowStr || '1', 10) - 1; // Excel использует 1-based индексацию
 
     return {
       type: 'cell',
@@ -255,8 +255,8 @@ export class FormulaUtils {
         type: 'cell',
         row: range.startRow,
         col: range.startCol,
-        absoluteRow: range.absoluteStartRow,
-        absoluteCol: range.absoluteStartCol,
+        absoluteRow: range.absoluteStartRow || false,
+        absoluteCol: range.absoluteStartCol || false,
       },
       rowOffset,
       colOffset,
@@ -271,8 +271,8 @@ export class FormulaUtils {
         type: 'cell',
         row: range.endRow,
         col: range.endCol,
-        absoluteRow: range.absoluteEndRow,
-        absoluteCol: range.absoluteEndCol,
+        absoluteRow: range.absoluteEndRow || false,
+        absoluteCol: range.absoluteEndCol || false,
       },
       rowOffset,
       colOffset,

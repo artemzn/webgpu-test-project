@@ -6,7 +6,6 @@ import {
   FormulaAST,
   FormulaNode,
   CellReference,
-  CellRange,
   NumberLiteral,
   StringLiteral,
   FunctionCall,
@@ -403,7 +402,7 @@ export class FormulaParser {
    */
   private currentChar(): string {
     if (this.isAtEnd()) return '\0';
-    return this.input[this.position];
+    return this.input[this.position] || '\0';
   }
 
   /**

@@ -80,6 +80,7 @@ describe('Grid Rendering Integration Tests', () => {
     // Создаем новое приложение для каждого теста
     const config = {
       enableWebGPU: true,
+      enableCollaborative: false,
       cellWidth: 100,
       cellHeight: 30,
       maxRows: 1000,
@@ -195,8 +196,6 @@ describe('Grid Rendering Integration Tests', () => {
 
   describe('Взаимодействие с пользователем', () => {
     it('должен обрабатывать клики по ячейкам', () => {
-      const virtualGrid = (app as any).virtualGrid as VirtualGrid;
-
       // Имитируем клик
       const clickEvent = new MouseEvent('click', {
         clientX: 500,
@@ -295,6 +294,7 @@ describe('Grid Rendering Integration Tests', () => {
       // Создаем приложение с отключенным WebGPU
       const config = {
         enableWebGPU: false,
+        enableCollaborative: false,
         cellWidth: 100,
         cellHeight: 30,
         maxRows: 1000,

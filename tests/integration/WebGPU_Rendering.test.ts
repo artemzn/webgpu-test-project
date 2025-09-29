@@ -3,7 +3,7 @@
  * Проверяет выполнение всех требований Sprint 2.1
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { GridRenderer } from '../../src/rendering/GridRenderer.js';
 import { RenderManager } from '../../src/rendering/webgpu-setup/RenderManager.js';
 import { RenderPipelineBuilder } from '../../src/rendering/webgpu-setup/RenderPipelineBuilder.js';
@@ -52,6 +52,7 @@ describe('WebGPU рендеринг', () => {
       device: mockDevice,
       context: mockContext,
       format: 'bgra8unorm' as GPUTextureFormat,
+      adapter: {} as GPUAdapter,
     };
 
     mockCanvas = {
