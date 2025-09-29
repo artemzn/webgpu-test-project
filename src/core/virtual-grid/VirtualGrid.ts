@@ -285,6 +285,15 @@ export class VirtualGrid {
   }
 
   /**
+   * Очистка кеша (вызывается при операциях со строками/столбцами)
+   */
+  clearCache(): void {
+    this.cachedCells = null;
+    this.cachedViewport = null;
+    console.log('🗑️ Кеш VirtualGrid очищен');
+  }
+
+  /**
    * Получение размера ячейки
    */
   getCellSize(): { width: number; height: number } {

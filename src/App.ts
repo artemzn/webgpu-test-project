@@ -10,6 +10,7 @@ import { HeaderRenderer } from './rendering/HeaderRenderer.js';
 import { TextRenderer } from './rendering/TextRenderer.js';
 import { VirtualGrid } from './core/virtual-grid/VirtualGrid.js';
 import { SparseMatrix } from './core/sparse-matrix/SparseMatrix.js';
+import { OperationHistory, type AnyOperation } from './core/operation-history/OperationHistory.js';
 
 export class App {
   private config: AppConfig;
@@ -21,6 +22,7 @@ export class App {
   private textRenderer: TextRenderer | null = null;
   private virtualGrid: VirtualGrid | null = null;
   private sparseMatrix: SparseMatrix | null = null;
+  private operationHistory: OperationHistory | null = null;
   private isInitialized = false;
 
   // Координаты для контекстного меню
@@ -162,6 +164,10 @@ export class App {
     this.sparseMatrix = new SparseMatrix();
 
     console.log('✅ Разреженная матрица инициализирована');
+
+    // Инициализируем историю операций
+    this.operationHistory = new OperationHistory(100);
+    console.log('✅ История операций инициализирована');
 
     // ДОБАВЛЯЕМ ТЕСТОВЫЕ ДАННЫЕ для демонстрации текста
     this.addTestData();
@@ -966,14 +972,6 @@ export class App {
     }
   }
 
-  private undo(): void {
-    console.log('↶ Отмена операции');
-  }
-
-  private redo(): void {
-    console.log('↷ Повтор операции');
-  }
-
   private copy(): void {
     console.log('📋 Копирование');
 
@@ -1147,15 +1145,46 @@ export class App {
    * Вставка строки
    */
   private insertRow(): void {
-    if (!this.sparseMatrix) return;
+    if (!this.sparseMatrix || !this.operationHistory) return;
 
     // Используем координаты из контекстного меню
     const insertAtRow = this.contextMenuCell ? this.contextMenuCell.row : 0;
 
     console.log(`➕ Вставка строки на позиции ${insertAtRow}`);
 
+    // Собираем данные о затронутых ячейках для отмены
+    const affectedCells: Array<{ row: number; col: number; value: any }> = [];
+
+    // Получаем viewport для сбора данных
+    if (this.virtualGrid) {
+      const viewport = this.virtualGrid.getViewport();
+      for (let row = insertAtRow; row < viewport.endRow; row++) {
+        for (let col = viewport.startCol; col < viewport.endCol; col++) {
+          const value = this.sparseMatrix.getCell(row, col);
+          if (value !== null) {
+            affectedCells.push({ row, col, value });
+          }
+        }
+      }
+    }
+
     // Вставляем строку в SparseMatrix
     this.sparseMatrix.insertRow(insertAtRow);
+
+    // Очищаем кеш VirtualGrid
+    if (this.virtualGrid) {
+      this.virtualGrid.clearCache();
+    }
+
+    // Сохраняем операцию в историю
+    this.operationHistory.addOperation({
+      type: 'insert_row',
+      data: {
+        atRow: insertAtRow,
+        affectedCells: affectedCells,
+      },
+      description: `Вставка строки на позиции ${insertAtRow + 1}`,
+    });
 
     // Принудительно перерисовываем
     this.needsRender = true;
@@ -1166,15 +1195,47 @@ export class App {
    * Вставка столбца
    */
   private insertColumn(): void {
-    if (!this.sparseMatrix) return;
+    if (!this.sparseMatrix || !this.operationHistory) return;
 
     // Используем координаты из контекстного меню
     const insertAtCol = this.contextMenuCell ? this.contextMenuCell.col : 0;
 
     console.log(`➕ Вставка столбца на позиции ${insertAtCol}`);
 
+    // Собираем данные о затронутых ячейках для отмены
+    const affectedCells: Array<{ row: number; col: number; value: any }> = [];
+
+    // Получаем viewport для сбора данных
+    if (this.virtualGrid) {
+      const viewport = this.virtualGrid.getViewport();
+      for (let row = viewport.startRow; row < viewport.endRow; row++) {
+        for (let col = insertAtCol; col < viewport.endCol; col++) {
+          const value = this.sparseMatrix.getCell(row, col);
+          if (value !== null) {
+            affectedCells.push({ row, col, value });
+          }
+        }
+      }
+    }
+
     // Вставляем столбец в SparseMatrix
     this.sparseMatrix.insertColumn(insertAtCol);
+
+    // Очищаем кеш VirtualGrid
+    if (this.virtualGrid) {
+      this.virtualGrid.clearCache();
+    }
+
+    // Сохраняем операцию в историю
+    const columnLetter = this.indexToColumnLetter(insertAtCol);
+    this.operationHistory.addOperation({
+      type: 'insert_column',
+      data: {
+        atCol: insertAtCol,
+        affectedCells: affectedCells,
+      },
+      description: `Вставка столбца ${columnLetter}`,
+    });
 
     // Принудительно перерисовываем
     this.needsRender = true;
@@ -1185,7 +1246,7 @@ export class App {
    * Удаление строки
    */
   private deleteRow(): void {
-    if (!this.sparseMatrix) return;
+    if (!this.sparseMatrix || !this.operationHistory) return;
 
     // Используем координаты из контекстного меню
     if (!this.contextMenuCell) {
@@ -1203,8 +1264,37 @@ export class App {
 
     console.log(`🗑️ Удаление строки ${deleteAtRow}`);
 
+    // Собираем данные удаляемых ячеек для отмены
+    const deletedCells: Array<{ row: number; col: number; value: any }> = [];
+
+    // Получаем viewport для сбора данных
+    if (this.virtualGrid) {
+      const viewport = this.virtualGrid.getViewport();
+      for (let col = viewport.startCol; col < viewport.endCol; col++) {
+        const value = this.sparseMatrix.getCell(deleteAtRow, col);
+        if (value !== null) {
+          deletedCells.push({ row: deleteAtRow, col, value });
+        }
+      }
+    }
+
     // Удаляем строку из SparseMatrix
     this.sparseMatrix.deleteRow(deleteAtRow);
+
+    // Очищаем кеш VirtualGrid
+    if (this.virtualGrid) {
+      this.virtualGrid.clearCache();
+    }
+
+    // Сохраняем операцию в историю
+    this.operationHistory.addOperation({
+      type: 'delete_row',
+      data: {
+        atRow: deleteAtRow,
+        deletedCells: deletedCells,
+      },
+      description: `Удаление строки ${deleteAtRow + 1}`,
+    });
 
     // Принудительно перерисовываем
     this.needsRender = true;
@@ -1215,7 +1305,7 @@ export class App {
    * Удаление столбца
    */
   private deleteColumn(): void {
-    if (!this.sparseMatrix) return;
+    if (!this.sparseMatrix || !this.operationHistory) return;
 
     // Используем координаты из контекстного меню
     if (!this.contextMenuCell) {
@@ -1236,8 +1326,37 @@ export class App {
 
     console.log(`🗑️ Удаление столбца ${deleteAtCol} (${columnLetter})`);
 
+    // Собираем данные удаляемых ячеек для отмены
+    const deletedCells: Array<{ row: number; col: number; value: any }> = [];
+
+    // Получаем viewport для сбора данных
+    if (this.virtualGrid) {
+      const viewport = this.virtualGrid.getViewport();
+      for (let row = viewport.startRow; row < viewport.endRow; row++) {
+        const value = this.sparseMatrix.getCell(row, deleteAtCol);
+        if (value !== null) {
+          deletedCells.push({ row, col: deleteAtCol, value });
+        }
+      }
+    }
+
     // Удаляем столбец из SparseMatrix
     this.sparseMatrix.deleteColumn(deleteAtCol);
+
+    // Очищаем кеш VirtualGrid
+    if (this.virtualGrid) {
+      this.virtualGrid.clearCache();
+    }
+
+    // Сохраняем операцию в историю
+    this.operationHistory.addOperation({
+      type: 'delete_column',
+      data: {
+        atCol: deleteAtCol,
+        deletedCells: deletedCells,
+      },
+      description: `Удаление столбца ${columnLetter}`,
+    });
 
     // Принудительно перерисовываем
     this.needsRender = true;
@@ -1276,6 +1395,24 @@ export class App {
     const formulaInput = document.getElementById('formula-input') as HTMLInputElement;
     if (document.activeElement === formulaInput) {
       return;
+    }
+
+    // Обработка Undo/Redo
+    if (event.ctrlKey || event.metaKey) {
+      switch (event.key.toLowerCase()) {
+        case 'z':
+          event.preventDefault();
+          if (event.shiftKey) {
+            this.redo(); // Ctrl+Shift+Z для Redo
+          } else {
+            this.undo(); // Ctrl+Z для Undo
+          }
+          return;
+        case 'y':
+          event.preventDefault();
+          this.redo(); // Ctrl+Y для Redo
+          return;
+      }
     }
 
     if (!this.virtualGrid) return;
@@ -1427,5 +1564,133 @@ export class App {
       index = Math.floor(index / 26) - 1;
     }
     return result;
+  }
+
+  /**
+   * Отмена последней операции
+   */
+  private undo(): void {
+    if (!this.operationHistory || !this.sparseMatrix) return;
+
+    const operation = this.operationHistory.undo();
+    if (!operation) {
+      console.log('⚠️ Нет операций для отмены');
+      return;
+    }
+
+    console.log(`↶ Отмена операции: ${operation.type}`);
+
+    try {
+      this.applyUndoOperation(operation);
+      this.needsRender = true;
+      this.render();
+    } catch (error) {
+      console.error('❌ Ошибка при отмене операции:', error);
+    }
+  }
+
+  /**
+   * Повтор отмененной операции
+   */
+  private redo(): void {
+    if (!this.operationHistory || !this.sparseMatrix) return;
+
+    const operation = this.operationHistory.redo();
+    if (!operation) {
+      console.log('⚠️ Нет операций для повтора');
+      return;
+    }
+
+    console.log(`↷ Повтор операции: ${operation.type}`);
+
+    try {
+      this.applyRedoOperation(operation);
+      this.needsRender = true;
+      this.render();
+    } catch (error) {
+      console.error('❌ Ошибка при повторе операции:', error);
+    }
+  }
+
+  /**
+   * Применение операции отмены
+   */
+  private applyUndoOperation(operation: AnyOperation): void {
+    switch (operation.type) {
+      case 'insert_row':
+        // Отмена вставки строки = удаление строки
+        this.sparseMatrix!.deleteRow(operation.data.atRow);
+        break;
+      case 'delete_row':
+        // Отмена удаления строки = восстановление данных
+        this.sparseMatrix!.insertRow(operation.data.atRow);
+        // Восстанавливаем данные ячеек
+        for (const cell of operation.data.deletedCells) {
+          this.sparseMatrix!.setCell(cell.row, cell.col, cell.value);
+        }
+        break;
+      case 'insert_column':
+        // Отмена вставки столбца = удаление столбца
+        this.sparseMatrix!.deleteColumn(operation.data.atCol);
+        break;
+      case 'delete_column':
+        // Отмена удаления столбца = восстановление данных
+        this.sparseMatrix!.insertColumn(operation.data.atCol);
+        // Восстанавливаем данные ячеек
+        for (const cell of operation.data.deletedCells) {
+          this.sparseMatrix!.setCell(cell.row, cell.col, cell.value);
+        }
+        break;
+      case 'set_cell':
+        // Отмена изменения ячейки = восстановление старого значения
+        this.sparseMatrix!.setCell(operation.data.row, operation.data.col, operation.data.oldValue);
+        break;
+      case 'clear_cell':
+        // Отмена очистки ячейки = восстановление значения
+        this.sparseMatrix!.setCell(operation.data.row, operation.data.col, operation.data.oldValue);
+        break;
+    }
+
+    // Очищаем кеш VirtualGrid после любой операции
+    if (this.virtualGrid) {
+      this.virtualGrid.clearCache();
+    }
+  }
+
+  /**
+   * Применение операции повтора
+   */
+  private applyRedoOperation(operation: AnyOperation): void {
+    switch (operation.type) {
+      case 'insert_row':
+        // Повтор вставки строки
+        this.sparseMatrix!.insertRow(operation.data.atRow);
+        break;
+      case 'delete_row':
+        // Повтор удаления строки
+        this.sparseMatrix!.deleteRow(operation.data.atRow);
+        break;
+      case 'insert_column':
+        // Повтор вставки столбца
+        this.sparseMatrix!.insertColumn(operation.data.atCol);
+        break;
+      case 'delete_column':
+        // Повтор удаления столбца
+        this.sparseMatrix!.deleteColumn(operation.data.atCol);
+        break;
+      case 'set_cell':
+        // Повтор изменения ячейки
+        this.sparseMatrix!.setCell(operation.data.row, operation.data.col, operation.data.newValue);
+        break;
+      case 'clear_cell':
+        // Повтор очистки ячейки
+        this.sparseMatrix!.removeCell(operation.data.row, operation.data.col);
+        break;
+    }
+
+    // Очищаем кеш VirtualGrid после любой операции
+    if (this.virtualGrid) {
+      this.virtualGrid.clearCache();
+    }
   }
 }
