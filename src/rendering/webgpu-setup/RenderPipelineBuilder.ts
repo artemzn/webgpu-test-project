@@ -4,9 +4,11 @@
 
 export class RenderPipelineBuilder {
   private device: GPUDevice;
+  private canvasFormat: GPUTextureFormat;
 
-  constructor(device: GPUDevice) {
+  constructor(device: GPUDevice, canvasFormat: GPUTextureFormat = 'bgra8unorm') {
     this.device = device;
+    this.canvasFormat = canvasFormat;
   }
 
   /**
@@ -35,7 +37,7 @@ export class RenderPipelineBuilder {
         entryPoint: 'fs_main',
         targets: [
           {
-            format: 'bgra8unorm',
+            format: this.canvasFormat,
           },
         ],
       },
@@ -103,7 +105,7 @@ export class RenderPipelineBuilder {
 
         let screenPos = vec2f(
           (finalPos.x / gridUniforms.viewportSize.x) * 2.0 - 1.0,
-          (finalPos.y / gridUniforms.viewportSize.y) * 2.0 - 1.0
+          1.0 - (finalPos.y / gridUniforms.viewportSize.y) * 2.0
         );
 
         output.position = vec4f(screenPos, 0.0, 1.0);
@@ -176,7 +178,7 @@ export class RenderPipelineBuilder {
    */
   createSelectionUniformBuffer(): GPUBuffer {
     const buffer = this.device.createBuffer({
-      size: 32, // 8 floats * 4 bytes each (cellPosition, cellSize, viewportSize + padding)
+      size: 24, // 6 floats * 4 bytes each (cellPosition, cellSize, viewportSize)
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
       label: 'Selection Uniform Buffer',
     });
@@ -273,8 +275,6 @@ export class RenderPipelineBuilder {
       ...cellPosition, // cellPosition: vec2f
       ...cellSize, // cellSize: vec2f
       ...viewportSize, // viewportSize: vec2f
-      0.0,
-      0.0, // padding
     ]);
 
     this.device.queue.writeBuffer(uniformBuffer, 0, data);
@@ -361,10 +361,10 @@ export class RenderPipelineBuilder {
         );
         let worldPos = cellPos + pos * headerUniforms.cellSize;
         
-        // Преобразуем в NDC координаты КАК В GRID SHADER
+        // Преобразуем в NDC координаты с правильной инверсией Y
         let screenPos = vec2f(
           (worldPos.x / headerUniforms.viewportSize.x) * 2.0 - 1.0,
-          (worldPos.y / headerUniforms.viewportSize.y) * 2.0 - 1.0  // БЕЗ ИНВЕРСИИ КАК В GRID!
+          1.0 - (worldPos.y / headerUniforms.viewportSize.y) * 2.0  // ИНВЕРСИЯ Y КАК В test-headers!
         );
         
         output.position = vec4f(screenPos, -0.1, 1.0); // БЛИЖЕ К КАМЕРЕ!
@@ -400,7 +400,7 @@ export class RenderPipelineBuilder {
         entryPoint: 'fs_main',
         targets: [
           {
-            format: 'bgra8unorm',
+            format: this.canvasFormat,
             // БЕЗ BLENDING - заголовки непрозрачные
           },
         ],
@@ -449,7 +449,7 @@ export class RenderPipelineBuilder {
         // Добавляем отступы СЛЕВА и СВЕРХУ как в основной сетке
         let cellPos = vec2f(
           selectionUniforms.cellPosition.x + 30.0, // +30px СЛЕВА для номеров строк
-          selectionUniforms.cellPosition.y + 25.0 - 5.0  // +25px СВЕРХУ для заголовков - 5px коррекция
+          selectionUniforms.cellPosition.y + 25.0  // +25px СВЕРХУ для заголовков столбцов
         );
         let worldPos = cellPos + pos * selectionUniforms.cellSize;
         
@@ -490,7 +490,7 @@ export class RenderPipelineBuilder {
         entryPoint: 'fs_main',
         targets: [
           {
-            format: 'bgra8unorm',
+            format: this.canvasFormat,
             blend: {
               color: {
                 srcFactor: 'src-alpha',
@@ -564,7 +564,7 @@ export class RenderPipelineBuilder {
         // Преобразуем в нормализованные координаты экрана (-1 до 1)
         let screenPos = vec2f(
           (finalPos.x / gridUniforms.viewportSize.x) * 2.0 - 1.0,
-          (finalPos.y / gridUniforms.viewportSize.y) * 2.0 - 1.0
+          1.0 - (finalPos.y / gridUniforms.viewportSize.y) * 2.0
         );
 
         output.position = vec4f(screenPos, 0.0, 1.0);
@@ -603,7 +603,7 @@ export class RenderPipelineBuilder {
     `;
 
     const shaderModule = this.device.createShaderModule({
-      code: vertexShader + fragmentShader,
+      code: `${vertexShader}\n\n${fragmentShader}`,
       label: 'Border Shader Module',
     });
 
@@ -630,7 +630,7 @@ export class RenderPipelineBuilder {
         entryPoint: 'fs_main',
         targets: [
           {
-            format: 'bgra8unorm',
+            format: this.canvasFormat,
             blend: {
               color: {
                 srcFactor: 'src-alpha',

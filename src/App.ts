@@ -913,8 +913,12 @@ export class App {
             // Загружаем новые данные
             if (data.cells) {
               Object.entries(data.cells).forEach(([key, value]) => {
-                const [row, col] = key.split(',').map(Number);
-                this.sparseMatrix!.setCell(row, col, value as string);
+                const parts = key.split(',').map(Number);
+                const row = parts[0];
+                const col = parts[1];
+                if (row !== undefined && col !== undefined) {
+                  this.sparseMatrix!.setCell(row, col, value as string);
+                }
               });
             }
 

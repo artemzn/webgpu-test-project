@@ -45,7 +45,7 @@ export class RenderManager {
     this.cellWidth = cellWidth;
     this.cellHeight = cellHeight;
 
-    this.pipelineBuilder = new RenderPipelineBuilder(this.device);
+    this.pipelineBuilder = new RenderPipelineBuilder(this.device, config.format);
 
     console.log('🔧 Инициализация RenderManager...');
   }
@@ -215,10 +215,10 @@ export class RenderManager {
         console.log(`🎯 Выделение отрендерено в основном render pass для позиции ${cellPosition}`);
       }
 
-      // 4. Рендерим заголовки столбцов и строк ПОВЕРХ ВСЕГО
-      console.log('🎯 НАЧИНАЕМ РЕНДЕРИНГ ЗАГОЛОВКОВ!');
-      this.renderHeaders(renderPass, viewport);
-      console.log('🎯 ЗАГОЛОВКИ ОТРЕНДЕРЕНЫ!');
+      // 4. WebGPU заголовки отключены - используем Canvas 2D заголовки
+      // console.log('🎯 НАЧИНАЕМ РЕНДЕРИНГ ЗАГОЛОВКОВ!');
+      // this.renderHeaders(renderPass, viewport);
+      // console.log('🎯 ЗАГОЛОВКИ ОТРЕНДЕРЕНЫ!');
 
       // Завершаем рендер-пасс
       renderPass.end();
