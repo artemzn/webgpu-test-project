@@ -20,6 +20,9 @@ export class VirtualGrid {
   private cachedCells: Cell[] | null = null;
   private cachedViewport: Viewport | null = null;
 
+  // Функция для получения значений ячеек (для формул)
+  private getCellValue: ((row: number, col: number) => any) | null = null;
+
   constructor(
     canvasWidth: number,
     canvasHeight: number,
@@ -68,10 +71,16 @@ export class VirtualGrid {
 
     for (let row = this.viewport.startRow; row < this.viewport.endRow; row++) {
       for (let col = this.viewport.startCol; col < this.viewport.endCol; col++) {
+        // Получаем значение ячейки через провайдер (для формул)
+        const cellValue = this.getCellValue ? this.getCellValue(row, col) : null;
+
+        // Извлекаем значение из CellValue объекта
+        const value = cellValue ? cellValue.value : null;
+
         const cell: Cell = {
           row,
           col,
-          value: null,
+          value,
           screenX: (col - this.viewport.startCol) * this.cellWidth - this.scrollX,
           screenY: (row - this.viewport.startRow) * this.cellHeight - this.scrollY,
           width: this.cellWidth,
@@ -291,6 +300,15 @@ export class VirtualGrid {
     this.cachedCells = null;
     this.cachedViewport = null;
     console.log('🗑️ Кеш VirtualGrid очищен');
+  }
+
+  /**
+   * Установка функции для получения значений ячеек (для формул)
+   */
+  setCellValueProvider(getCellValue: (row: number, col: number) => any): void {
+    this.getCellValue = getCellValue;
+    this.clearCache(); // Очищаем кеш при изменении провайдера
+    console.log('📊 Установлен провайдер значений ячеек для формул');
   }
 
   /**

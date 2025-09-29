@@ -283,6 +283,15 @@ export class SparseMatrix {
   insertRow(atRow: number): void {
     console.log(`🔧 Вставка строки на позиции ${atRow}`);
 
+    // Отладка: показываем данные до вставки
+    console.log(`🔧 ДАННЫЕ ДО ВСТАВКИ:`);
+    for (let row = 1; row <= 4; row++) {
+      for (let col = 3; col <= 3; col++) {
+        const value = this.getCell(row, col);
+        console.log(`🔧   ${row},${col}: ${value}`);
+      }
+    }
+
     // Создаем новую карту для обновленных данных
     const newBlocks = new Map<string, Map<string, any>>();
 
@@ -321,6 +330,15 @@ export class SparseMatrix {
 
     this.blocks = newBlocks;
     console.log(`✅ Строка вставлена на позиции ${atRow}`);
+
+    // Отладка: показываем данные после вставки
+    console.log(`🔧 ДАННЫЕ ПОСЛЕ ВСТАВКИ:`);
+    for (let row = 1; row <= 5; row++) {
+      for (let col = 3; col <= 3; col++) {
+        const value = this.getCell(row, col);
+        console.log(`🔧   ${row},${col}: ${value}`);
+      }
+    }
   }
 
   /**

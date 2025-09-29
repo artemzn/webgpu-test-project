@@ -11,6 +11,7 @@ import { TextRenderer } from './rendering/TextRenderer.js';
 import { VirtualGrid } from './core/virtual-grid/VirtualGrid.js';
 import { SparseMatrix } from './core/sparse-matrix/SparseMatrix.js';
 import { OperationHistory, type AnyOperation } from './core/operation-history/OperationHistory.js';
+import { FormulaManager, type CellValue } from './core/formulas/FormulaManager.js';
 
 export class App {
   private config: AppConfig;
@@ -23,6 +24,7 @@ export class App {
   private virtualGrid: VirtualGrid | null = null;
   private sparseMatrix: SparseMatrix | null = null;
   private operationHistory: OperationHistory | null = null;
+  private formulaManager: FormulaManager | null = null;
   private isInitialized = false;
 
   // Координаты для контекстного меню
@@ -169,6 +171,28 @@ export class App {
     this.operationHistory = new OperationHistory(100);
     console.log('✅ История операций инициализирована');
 
+    // Инициализируем менеджер формул
+    this.formulaManager = new FormulaManager({
+      getCellValue: (row: number, col: number) => this.getCellValue(row, col),
+      getCellRange: (startRow: number, startCol: number, endRow: number, endCol: number) =>
+        this.getCellRange(startRow, startCol, endRow, endCol),
+    });
+
+    // Устанавливаем callback для обновления формул в SparseMatrix
+    this.formulaManager.setUpdateFormulaCallback((row: number, col: number, formula: string) => {
+      this.sparseMatrix?.setCell(row, col, formula);
+    });
+
+    console.log('✅ Менеджер формул инициализирован');
+
+    // Устанавливаем провайдер значений в VirtualGrid для формул
+    if (this.virtualGrid) {
+      this.virtualGrid.setCellValueProvider((row: number, col: number) => {
+        const cellValue = this.getCellValue(row, col);
+        return cellValue.value; // Возвращаем только значение, не тип
+      });
+    }
+
     // ДОБАВЛЯЕМ ТЕСТОВЫЕ ДАННЫЕ для демонстрации текста
     this.addTestData();
   }
@@ -206,6 +230,22 @@ export class App {
     // Формулы для демонстрации
     this.sparseMatrix.setCell(5, 0, 'Итого:');
     this.sparseMatrix.setCell(5, 3, '=SUM(D2:D4)');
+
+    // Добавляем формулу MIN
+    this.sparseMatrix.setCell(6, 3, '=MIN(D2:D4)');
+    console.log('📊 Добавлена формула: =MIN(D2:D4)');
+
+    // Добавляем формулу MAX
+    this.sparseMatrix.setCell(7, 3, '=MAX(D2:D4)');
+    console.log('📊 Добавлена формула: =MAX(D2:D4)');
+
+    // Добавляем формулу AVERAGE
+    this.sparseMatrix.setCell(8, 3, '=AVERAGE(D2:D4)');
+    console.log('📊 Добавлена формула: =AVERAGE(D2:D4)');
+
+    // Добавляем простую арифметику
+    this.sparseMatrix.setCell(9, 3, '=D2+D3');
+    console.log('📊 Добавлена формула: =D2+D3');
 
     // Длинный текст для тестирования обрезки
     this.sparseMatrix.setCell(7, 0, 'Очень длинный текст который не поместится в ячейку');
@@ -1171,6 +1211,11 @@ export class App {
     // Вставляем строку в SparseMatrix
     this.sparseMatrix.insertRow(insertAtRow);
 
+    // Обрабатываем формулы
+    if (this.formulaManager) {
+      this.formulaManager.handleRowInsertion(insertAtRow);
+    }
+
     // Очищаем кеш VirtualGrid
     if (this.virtualGrid) {
       this.virtualGrid.clearCache();
@@ -1220,6 +1265,11 @@ export class App {
 
     // Вставляем столбец в SparseMatrix
     this.sparseMatrix.insertColumn(insertAtCol);
+
+    // Обрабатываем формулы
+    if (this.formulaManager) {
+      this.formulaManager.handleColumnInsertion(insertAtCol);
+    }
 
     // Очищаем кеш VirtualGrid
     if (this.virtualGrid) {
@@ -1280,6 +1330,11 @@ export class App {
 
     // Удаляем строку из SparseMatrix
     this.sparseMatrix.deleteRow(deleteAtRow);
+
+    // Обрабатываем формулы
+    if (this.formulaManager) {
+      this.formulaManager.handleRowDeletion(deleteAtRow);
+    }
 
     // Очищаем кеш VirtualGrid
     if (this.virtualGrid) {
@@ -1342,6 +1397,11 @@ export class App {
 
     // Удаляем столбец из SparseMatrix
     this.sparseMatrix.deleteColumn(deleteAtCol);
+
+    // Обрабатываем формулы
+    if (this.formulaManager) {
+      this.formulaManager.handleColumnDeletion(deleteAtCol);
+    }
 
     // Очищаем кеш VirtualGrid
     if (this.virtualGrid) {
@@ -1564,6 +1624,87 @@ export class App {
       index = Math.floor(index / 26) - 1;
     }
     return result;
+  }
+
+  /**
+   * Получение значения ячейки для формул
+   */
+  private getCellValue(row: number, col: number): CellValue {
+    if (!this.sparseMatrix) {
+      return { value: null, type: 'empty' };
+    }
+
+    const value = this.sparseMatrix.getCell(row, col);
+
+    if (value === null) {
+      return { value: null, type: 'empty' };
+    }
+
+    // Проверяем, является ли значение формулой
+    if (typeof value === 'string' && value.startsWith('=')) {
+      // Сначала устанавливаем формулу в менеджер, если её там нет
+      if (this.formulaManager) {
+        const existingFormula = this.formulaManager.getFormula(row, col);
+        if (!existingFormula) {
+          this.formulaManager.setFormula(row, col, value);
+        }
+        // Вычисляем формулу
+        const result = this.formulaManager.evaluateFormula(row, col);
+        console.log(
+          `🔍 getCellValue(${row},${col}): формула ${value} -> ${JSON.stringify(result)}`
+        );
+
+        // Отладка для формул в столбце 3
+        if (col === 3 && row >= 5) {
+          console.log(`🔍 ОТЛАДКА ФОРМУЛЫ: ${row},${col} = ${value} -> ${JSON.stringify(result)}`);
+        }
+
+        return result;
+      }
+    }
+
+    // Обычное значение
+    if (typeof value === 'number') {
+      const result = { value, type: 'number' as const };
+      console.log(`🔍 getCellValue(${row},${col}): число ${value} -> ${JSON.stringify(result)}`);
+      return result;
+    } else if (typeof value === 'string') {
+      // Проверяем, является ли строка числом
+      const numValue = parseFloat(value);
+      if (!isNaN(numValue) && isFinite(numValue)) {
+        const result = { value: numValue, type: 'number' as const };
+        console.log(
+          `🔍 getCellValue(${row},${col}): строка-число ${value} -> ${JSON.stringify(result)}`
+        );
+        return result;
+      } else {
+        const result = { value, type: 'string' as const };
+        console.log(`🔍 getCellValue(${row},${col}): строка ${value} -> ${JSON.stringify(result)}`);
+        return result;
+      }
+    }
+
+    return { value: null, type: 'empty' };
+  }
+
+  /**
+   * Получение диапазона ячеек для формул
+   */
+  private getCellRange(
+    startRow: number,
+    startCol: number,
+    endRow: number,
+    endCol: number
+  ): CellValue[] {
+    const values: CellValue[] = [];
+
+    for (let row = startRow; row <= endRow; row++) {
+      for (let col = startCol; col <= endCol; col++) {
+        values.push(this.getCellValue(row, col));
+      }
+    }
+
+    return values;
   }
 
   /**
